@@ -1,0 +1,17 @@
+# Local Claude rules — personal, not for the repo
+CLAUDE.local.md
+
+# Backend
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Frontend
+node_modules/
+dist/
+
+# Editors / OS
+.idea/
+.vscode/
