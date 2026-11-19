@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Мурдоку — детективный пазл</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1>Мурдоку</h1>
+    <span class="header__hint" id="mock-hint" hidden>Демо-режим (?mock=1)</span>
+  </header>
+
+  <main class="layout">
+    <section class="board-area">
+      <div id="board" class="board" aria-label="Поле пазла"></div>
+      <p id="status" class="status" role="status"></p>
+    </section>
+
+    <aside class="panel">
+      <section class="panel__section">
+        <label class="panel__label" for="difficulty">Сложность</label>
+        <div class="controls">
+          <select id="difficulty" class="select">
+            <option value="easy">Легко</option>
+            <option value="medium" selected>Средняя</option>
+            <option value="hard">Сложная</option>
+            <option value="expert">Эксперт</option>
+          </select>
+          <button id="new-game" class="button" type="button">Новая игра</button>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title">Подсказки</h2>
+        <ul id="clues" class="clues"></ul>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title">Люди</h2>
+        <p class="panel__note">Перетащите портрет на клетку поля.</p>
+        <div id="palette" class="palette"></div>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title">Обвинение</h2>
+        <div class="controls">
+          <input id="accusation" class="input" type="text" list="suspect-names"
+                 placeholder="Кто убийца?" autocomplete="off">
+          <datalist id="suspect-names"></datalist>
+          <button id="accuse" class="button button--accent" type="button" disabled>Обвинить</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="overlay" class="overlay" hidden>
+    <div class="overlay__card">
+      <h2 class="overlay__title">Дело раскрыто!</h2>
+      <p class="overlay__text">Убийца — <strong id="killer-name"></strong>.</p>
+      <button id="overlay-new-game" class="button" type="button">Новая игра</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
