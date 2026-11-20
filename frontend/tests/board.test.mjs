@@ -143,6 +143,82 @@ test('bed renders as one icon across both cells', () => {
   assert.equal(bed.style.gridRow, '2 / span 1');
 });
 
+// --- merged unions that are not rectangles (L/T shapes) ---
+
+// 4x4 single room; three tables forming an L at (0,0), (1,0), (1,1) so the
+// bbox cell (0,1) is plain floor: the old bbox rendering covered it with
+// the big icon (PROGRESS backlog, stage 5 polish).
+const L_PUZZLE = {
+  width: 4,
+  height: 4,
+  rooms: [{
+    id: 1,
+    cells: Array.from({ length: 16 }, (_, i) => ({ r: Math.floor(i / 4), c: i % 4 })),
+  }],
+  objects: [
+    { id: 'obj_1', type: 'table', cells: [{ r: 0, c: 0 }] },
+    { id: 'obj_2', type: 'table', cells: [{ r: 1, c: 0 }] },
+    { id: 'obj_3', type: 'table', cells: [{ r: 1, c: 1 }] },
+  ],
+  people: [
+    { id: 'suspect_1', name: 'Подозреваемый_1', portrait_seed: 1 },
+    { id: 'suspect_2', name: 'Подозреваемый_2', portrait_seed: 2 },
+    { id: 'victim', name: 'Убитый', portrait_seed: 3 },
+  ],
+  clues: [],
+};
+
+/** Cells covered by a grid-placed element from its "R / span H" styles. */
+function coveredCells(el) {
+  const [row, rowSpan] = el.style.gridRow.split(' / span ').map(Number);
+  const [col, colSpan] = el.style.gridColumn.split(' / span ').map(Number);
+  const cells = [];
+  for (let r = row - 1; r < row - 1 + rowSpan; r++) {
+    for (let c = col - 1; c < col - 1 + colSpan; c++) cells.push(`${r},${c}`);
+  }
+  return cells;
+}
+
+test('L-shaped table triple: icons cover exactly the union, not the bbox', () => {
+  const board = new Board(new FakeEl('div'), L_PUZZLE);
+  const multi = board.container._children.filter((el) => el.classList.contains('obj--multi'));
+  assert.equal(multi.length, 2, 'L = one 1x2 strip + one single-cell icon');
+  const covered = new Set(multi.flatMap(coveredCells));
+  assert.deepEqual([...covered].sort(), ['0,0', '1,0', '1,1'].sort(),
+    'icons cover the union cells and nothing else');
+  assert.ok(!covered.has('0,1'), 'floor cell inside the bbox stays uncovered');
+});
+
+test('L-shaped table triple: floor cell inside the bbox stays droppable', () => {
+  const board = new Board(new FakeEl('div'), L_PUZZLE);
+  const floor = board.cellEl(0, 1);
+  assert.ok(!floor.classList.contains('cell--full'), 'no full hatch on floor');
+  assert.equal((floor.listeners.click ?? []).length, 1, 'floor stays clickable');
+  assert.equal(board.canDropAt(0, 1), true, 'floor accepts a person');
+  for (const [r, c] of [[0, 0], [1, 0], [1, 1]]) {
+    assert.ok(board.cellEl(r, c).classList.contains('cell--full'),
+      `no-drop hatch on table cell ${r},${c}`);
+    assert.equal(board.canDropAt(r, c), false);
+  }
+});
+
+test('L-shaped carpet merge (partial): cells stay clickable and droppable', () => {
+  const puzzle = JSON.parse(JSON.stringify(L_PUZZLE));
+  for (const obj of puzzle.objects) obj.type = 'carpet';
+  const board = new Board(new FakeEl('div'), puzzle);
+  const multi = board.container._children.filter((el) => el.classList.contains('obj--multi'));
+  assert.equal(multi.length, 2);
+  for (const [r, c] of [[0, 0], [1, 0], [1, 1]]) {
+    const host = board.cellEl(r, c);
+    assert.equal((host.listeners.click ?? []).length, 1, `${r},${c} clickable`);
+    assert.ok(!host.classList.contains('cell--full'), `${r},${c} not hatched`);
+    assert.equal(board.canDropAt(r, c), true, `partial carpet cell ${r},${c} droppable`);
+  }
+  board.placePerson(1, 1, puzzle.people[0]);
+  assert.ok(board.cellEl(1, 1)._children.some((c) => c.classList.contains('chip')),
+    'a person can be placed on a merged carpet cell');
+});
+
 test('full object covers the cell and is not clickable; partial cell stays clickable', () => {
   const board = makeBoard();
   const tv = cellOf(board, 0, 4);

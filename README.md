@@ -1,0 +1,112 @@
+# Мурдоку
+
+Детективная вариация судоку-подобных пазлов (в духе LinkedIn Queens). На поле из
+комнат расставлены объекты и люди — подозреваемые и убитый. Набор подсказок
+однозначно определяет позиции всех людей; игрок расставляет портреты
+перетаскиванием, вычисляет комнату убийства и указывает убийцу. Проверка — по
+кнопке «Обвинить»: сервер не хранит состояния, решение передаётся в
+шифрованном токене (Fernet), клиент решение не видит.
+
+Правила игры — в [`SPEC.md`](SPEC.md), технические контракты — в
+[`ARCHITECTURE.md`](ARCHITECTURE.md), ход работ — в [`PROGRESS.md`](PROGRESS.md).
+
+## Стек
+
+- Бэкенд: Python 3.12+ (разработка на 3.14). Ядро (модель, солвер, генератор,
+  подсказки) — только стандартная библиотека; сервер — Starlette + uvicorn;
+  токены — `cryptography` (Fernet). Тесты — pytest.
+- Фронтенд: ванильный JS (ES-модули, без сборки), отдаётся бэкендом как статика.
+  Чистая логика (`clueToText`, портреты) покрыта `node --test`.
+
+## Quickstart
+
+Требуется Python ≥ 3.12 и Node ≥ 23 (для тестов фронтенда).
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -e 'backend[dev]'
+```
+
+**Примечание для Ubuntu:** в системном Python без `ensurepip` создание venv
+падает. Один из двух вариантов:
+
+```sh
+# вариант 1: доустановить venv-модуль с pip
+sudo apt install python3.14-venv
+
+# вариант 2: bootstrap pip через get-pip.py
+python3 -m venv --without-pip .venv
+.venv/bin/python get-pip.py   # скачайте с https://bootstrap.pypa.io/get-pip.py
+```
+
+### Запуск сервера
+
+```sh
+MURDOKU_SECRET=какой-нибудь-секрет .venv/bin/python -m murdoku.server
+```
+
+- `MURDOKU_SECRET` — обязателен (ключ токенов). Если не задан: при
+  `MURDOKU_DEV=1` сервер стартует со случайным ключом процесса (токены
+  недействительны после рестарта, в stderr печатается предупреждение), иначе —
+  отказ старта.
+- `MURDOKU_HOST` / `MURDOKU_PORT` — адрес и порт (по умолчанию `127.0.0.1:8000`).
+
+Открыть <http://127.0.0.1:8000/>.
+
+**Демо-режим без бэкенда:** `http://127.0.0.1:8000/?mock=1` — фронтенд
+работает на встроенном мок-пазле (удобно для UI-разработки и оффлайн-демо).
+Без `?mock=1` фронтенд ходит в реальный API.
+
+### Тесты
+
+```sh
+cd backend && ../.venv/bin/python -m pytest -q   # бэкенд (включая e2e)
+cd frontend && node --test                       # фронтенд (чистая логика)
+```
+
+### Бенчмарки
+
+```sh
+.venv/bin/python backend/scripts/bench_solver.py     # count_solutions на 9x9/N=9 (бюджет < 100 мс)
+.venv/bin/python backend/scripts/bench_generator.py  # время генерации по сложностям (expert < 3 с в среднем)
+```
+
+## Структура репозитория
+
+```
+backend/
+  pyproject.toml          # пакет murdoku (+ dev-зависимости)
+  murdoku/
+    model.py              # реестр типов, дата-классы, валидация, SPEC §4 JSON
+    solver.py             # count_solutions / solutions (MRV, битмаски)
+    clues.py              # перечисление истинных подсказок + жадное прореживание
+    generator.py          # полный пайплайн генерации (детерминированный по seed)
+    server/
+      app.py              # Starlette: /api/puzzle, /api/check, статика
+      tokens.py           # Fernet-токены (ключ из MURDOKU_SECRET)
+  tests/                  # pytest, включая этап 5: test_e2e.py (реальный генератор)
+  scripts/
+    bench_solver.py       # бенчмарк солвера
+    bench_generator.py    # бенчмарк генератора
+    export_clue_fixtures.py  # выгрузка фикстур для тестов фронтенда
+frontend/
+  index.html, styles.css
+  js/                     # main, api, mock, board, clues, portraits
+  tests/                  # node --test (*.test.mjs) + fixtures/ (реальные пазлы)
+```
+
+## API
+
+- `GET /api/puzzle?difficulty={easy|medium|hard|expert}[&seed=N]` →
+  `200 {"puzzle": {...}, "token": "..."}`; без `seed` — случайный seed;
+  неизвестная сложность/плохой seed → `400 {"error"}`; исчерпание попыток
+  генератора → `503 {"error"}`.
+- `POST /api/check` с телом `{"token", "placements": [{person_id, r, c}...],
+  "accusation": person_id}`:
+  - победа: `{"won": true, "solution": {...}}`;
+  - есть неверные расстановки: `{"won": false, "misplaced_person_id": "..."}` —
+    ровно один id, первый неверный в порядке «подозреваемые по номерам, убитый
+    последним»;
+  - расстановка верна, обвинение нет: `{"won": false, "correct_accusation": false}`;
+  - битый запрос/токен: `400 {"error"}`.
+- `/` — статика фронтенда.

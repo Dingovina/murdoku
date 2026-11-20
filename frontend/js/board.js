@@ -182,36 +182,79 @@ export class Board {
 
   _renderObjectGroup(group) {
     const cells = group.flatMap((o) => o.cells);
-    const minR = Math.min(...cells.map((x) => x.r));
-    const maxR = Math.max(...cells.map((x) => x.r));
-    const minC = Math.min(...cells.map((x) => x.c));
-    const maxC = Math.max(...cells.map((x) => x.c));
     const full = isFullType(group[0].type);
-    const multi = group.length > 1 || group[0].cells.length > 1; // merged or bed
+    const multi = group.length > 1 || cells.length > 1; // merged or bed
 
+    if (!multi) {
+      const host = this.cellEl(cells[0].r, cells[0].c);
+      if (!host) return; // defensive: cell outside the grid
+      const icon = this._buildIcon(group, multi, full);
+      host.appendChild(icon);
+      host.classList.add(full ? 'cell--full' : 'cell--partial');
+      return;
+    }
+
+    // A merged union is rarely a rectangle: one big icon over the union
+    // bounding box would visually cover the non-merged cells of L/T shapes,
+    // so render one icon per rectangle of a decomposition of the actual
+    // cell union instead (SPEC §2: merging is visual only).
+    for (const rect of this._unionRectangles(cells)) {
+      const icon = this._buildIcon(group, multi, full);
+      icon.style.gridRow = `${rect.r + 1} / span ${rect.h}`;
+      icon.style.gridColumn = `${rect.c + 1} / span ${rect.w}`;
+      this.container.appendChild(icon);
+    }
+    if (full) {
+      // covered cells still show the "no drop" hatch
+      for (const cell of cells) {
+        const host = this.cellEl(cell.r, cell.c);
+        if (host) host.classList.add('cell--full');
+      }
+    }
+  }
+
+  /** One object icon element (class + glyph, no grid positioning). */
+  _buildIcon(group, multi, full) {
     const icon = document.createElement('span');
     icon.className = 'obj' + (multi ? ' obj--multi' : '') + (full ? ' obj--full' : '');
     icon.textContent = OBJECT_ICONS[group[0].type] || '❓';
     if (group.length > 1) icon.title = 'Объединённый объект';
+    return icon;
+  }
 
-    if (multi) {
-      icon.style.gridRow = `${minR + 1} / span ${maxR - minR + 1}`;
-      icon.style.gridColumn = `${minC + 1} / span ${maxC - minC + 1}`;
-      this.container.appendChild(icon);
-      if (full) {
-        // covered cells still show the "no drop" hatch
-        for (const cell of cells) {
-          const host = this.cellEl(cell.r, cell.c);
-          if (host) host.classList.add('cell--full');
+  /**
+   * Greedy maximal-rectangle decomposition of the union of cells. Every
+   * rectangle lies inside the union (a non-union cell is never covered):
+   * repeatedly take the top-left-most remaining cell, extend the rectangle
+   * right along its row as far as the union allows, then down while the
+   * whole strip stays inside the union.
+   */
+  _unionRectangles(cells) {
+    const remaining = new Set(cells.map(({ r, c }) => key(r, c)));
+    const rects = [];
+    while (remaining.size) {
+      const [r0, c0] = [...remaining]
+        .map((k) => k.split(',').map(Number))
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1])[0];
+      let w = 1;
+      while (remaining.has(key(r0, c0 + w))) w++;
+      let h = 1;
+      let grows = true;
+      while (grows) {
+        for (let c = c0; c < c0 + w; c++) {
+          if (!remaining.has(key(r0 + h, c))) {
+            grows = false;
+            break;
+          }
         }
+        if (grows) h++;
       }
-    } else {
-      const host = this.cellEl(cells[0].r, cells[0].c);
-      if (!host) return; // defensive: cell outside the grid
-      host.appendChild(icon);
-      if (full) host.classList.add('cell--full');
-      else host.classList.add('cell--partial');
+      for (let r = r0; r < r0 + h; r++) {
+        for (let c = c0; c < c0 + w; c++) remaining.delete(key(r, c));
+      }
+      rects.push({ r: r0, c: c0, w, h });
     }
+    return rects;
   }
 
   // --- people ---
