@@ -298,21 +298,90 @@ class TestValidatePeople:
         )
         assert_invalid(dataclasses.replace(make_puzzle(), people=people))
 
-    def test_suspect_name_mismatch(self):
+    def test_duplicate_person_name_rejected(self):
         people = (
-            Person("suspect_1", "Подозреваемый_2", 1),
-            Person("suspect_2", "Подозреваемый_2", 2),
+            Person("suspect_1", "Анна", 1),
+            Person("suspect_2", "Анна", 2),
             Person("victim", "Убитый", 3),
         )
-        assert_invalid(dataclasses.replace(make_puzzle(), people=people), "name")
+        assert_invalid(dataclasses.replace(make_puzzle(), people=people),
+                       "duplicate")
 
-    def test_victim_name_mismatch(self):
+    def test_empty_person_name_rejected(self):
         people = (
-            Person("suspect_1", "Подозреваемый_1", 1),
-            Person("suspect_2", "Подозреваемый_2", 2),
-            Person("victim", "Погибший", 3),
+            Person("suspect_1", "", 1),
+            Person("suspect_2", "Борис", 2),
+            Person("victim", "Вера", 3),
         )
-        assert_invalid(dataclasses.replace(make_puzzle(), people=people), "name")
+        assert_invalid(dataclasses.replace(make_puzzle(), people=people),
+                       "non-empty")
+
+    def test_free_form_names_validate(self):
+        """Since phase 5 names come from the generator pool; any distinct
+        non-empty names are valid (legacy placeholders included)."""
+        people = (
+            Person("suspect_1", "Анна", 1, "f",
+                   {"gen": "Анны", "prep": "Анне"}),
+            Person("suspect_2", "Подозреваемый_2", 2),
+            Person("victim", "Пётр", 3, "m", {"gen": "Петра"}),
+        )
+        dataclasses.replace(make_puzzle(), people=people).validate()
+
+    def test_bad_gender_rejected(self):
+        people = (
+            Person("suspect_1", "Анна", 1, "x"),
+            Person("suspect_2", "Борис", 2),
+            Person("victim", "Вера", 3),
+        )
+        assert_invalid(dataclasses.replace(make_puzzle(), people=people),
+                       "gender")
+
+    def test_bad_person_forms_rejected(self):
+        people = (
+            Person("suspect_1", "Анна", 1, "f",
+                   {"gen": "Анны", "voc": "Анн"}),
+            Person("suspect_2", "Борис", 2),
+            Person("victim", "Вера", 3),
+        )
+        assert_invalid(dataclasses.replace(make_puzzle(), people=people),
+                       "form keys")
+
+    def test_non_string_form_rejected(self):
+        people = (
+            Person("suspect_1", "Анна", 1, "f", {"gen": 5}),
+            Person("suspect_2", "Борис", 2),
+            Person("victim", "Вера", 3),
+        )
+        assert_invalid(dataclasses.replace(make_puzzle(), people=people),
+                       "non-empty string")
+
+    def test_duplicate_room_name_rejected(self):
+        rooms = (
+            Room(1, frozenset({(0, 0), (1, 0), (2, 0)}), "Спальня"),
+            Room(2, frozenset({(0, 1), (1, 1), (2, 1)}), "Спальня"),
+            Room(3, frozenset({(0, 2), (1, 2), (2, 2)})),
+        )
+        assert_invalid(dataclasses.replace(make_puzzle(), rooms=rooms),
+                       "duplicate")
+
+    def test_room_names_and_forms_validate(self):
+        rooms = (
+            Room(1, frozenset({(0, 0), (1, 0), (2, 0)}), "Спальня",
+                 {"gen": "спальни", "prep": "спальне"}),
+            Room(2, frozenset({(0, 1), (1, 1), (2, 1)})),
+            Room(3, frozenset({(0, 2), (1, 2), (2, 2)}), "Кухня", {}),
+        )
+        dataclasses.replace(make_puzzle(), rooms=rooms).validate()
+
+    def test_bad_room_forms_rejected(self):
+        rooms = (
+            Room(1, frozenset({(0, 0), (1, 0), (2, 0)}), "Спальня",
+                 {"instr": "спальней"}),
+            Room(2, frozenset({(0, 1), (1, 1), (2, 1)})),
+            Room(3, frozenset({(0, 2), (1, 2), (2, 2)})),
+        )
+        assert_invalid(dataclasses.replace(make_puzzle(), rooms=rooms),
+                       "form keys")
 
     def test_portrait_seed_negative(self):
         people = (
@@ -418,6 +487,42 @@ class TestSerialization:
     def test_round_trip(self):
         puzzle = make_puzzle()
         assert Puzzle.from_dict(puzzle.to_dict()) == puzzle
+
+    def test_round_trip_with_names_and_forms(self):
+        """names/gender/forms survive the JSON round trip."""
+        rooms = (
+            Room(1, frozenset({(0, 0), (1, 0), (2, 0)}), "Спальня",
+                 {"gen": "спальни", "prep": "спальне"}),
+            Room(2, frozenset({(0, 1), (1, 1), (2, 1)})),
+            Room(3, frozenset({(0, 2), (1, 2), (2, 2)}), "Кухня",
+                 {"gen": "кухни", "prep": "кухне"}),
+        )
+        people = (
+            Person("suspect_1", "Анна", 1, "f",
+                   {"gen": "Анны", "prep": "Анне"}),
+            Person("suspect_2", "Пётр", 2, "m",
+                   {"gen": "Петра", "prep": "Петре"}),
+            Person("victim", "Ольга", 3, "f",
+                   {"gen": "Ольги", "prep": "Ольге"}),
+        )
+        puzzle = dataclasses.replace(make_puzzle(), rooms=rooms, people=people)
+        restored = Puzzle.from_dict(puzzle.to_dict())
+        assert restored == puzzle
+        assert restored.rooms[0].name == "Спальня"
+        assert restored.rooms[0].forms == {"gen": "спальни", "prep": "спальне"}
+        assert restored.people[0].gender == "f"
+        assert restored.people[1].forms == {"gen": "Петра", "prep": "Петре"}
+
+    def test_from_dict_accepts_legacy_entries_without_new_fields(self):
+        """Pre-phase-5 puzzle JSON (no name/forms/gender) still parses."""
+        good = make_puzzle().to_dict()
+        good["rooms"][0].pop("name", None)
+        good["rooms"][0].pop("forms", None)
+        good["people"][0].pop("gender", None)
+        good["people"][0].pop("forms", None)
+        puzzle = Puzzle.from_dict(good)
+        assert puzzle.rooms[0].name == ""
+        assert puzzle.people[0].gender == ""
 
     def test_round_trip_via_raw_json_style(self):
         puzzle = make_puzzle()

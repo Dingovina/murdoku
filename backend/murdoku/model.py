@@ -49,10 +49,19 @@ OBJECT_TYPE_IDS: tuple[str, ...] = tuple(OBJECT_TYPES)
 
 @dataclass(frozen=True)
 class Room:
-    """A room: a connected set of playable cells with a dense numeric id."""
+    """A room: a connected set of playable cells with a dense numeric id.
+
+    ``name`` is the display nominative ("Спальня"); "" means unnamed (the
+    frontend falls back to "Комната_{id}").  ``forms`` carries explicit
+    inflected Russian forms {"gen", "prep"} (ideas.md v2 names — the
+    frontend never inflects); it is display metadata, excluded from
+    equality/hash.
+    """
 
     id: int                      # 1..R, dense, sorted by corner cell (SPEC §1)
     cells: frozenset[Cell]
+    name: str = ""
+    forms: dict = field(default_factory=dict, compare=False, hash=False)
 
     @property
     def corner(self) -> Cell:
@@ -71,11 +80,20 @@ class ObjectInstance:
 
 @dataclass(frozen=True)
 class Person:
-    """A person: one of the suspects or the victim."""
+    """A person: one of the suspects or the victim.
+
+    ``name`` is the display nominative (a real Russian name from the
+    generator's curated pool, or a legacy placeholder).  ``gender`` is
+    "" (unspecified), "m" or "f".  ``forms`` carries explicit inflected
+    forms {"gen", "prep"} (ideas.md v2 names); display metadata, excluded
+    from equality/hash.
+    """
 
     id: str             # "suspect_1".."suspect_{N-1}", victim id == "victim"
-    name: str           # "Подозреваемый_N" / "Убитый"
+    name: str
     portrait_seed: int  # 0 .. 2**32-1
+    gender: str = ""
+    forms: dict = field(default_factory=dict, compare=False, hash=False)
 
 
 @dataclass(frozen=True)
@@ -174,6 +192,7 @@ class Puzzle:
         # rooms ----------------------------------------------------------
         prev_corner: Cell | None = None
         seen_cells: set[Cell] = set()
+        seen_names: set[str] = set()
         for i, room in enumerate(self.rooms):
             if not _is_int(room.id) or room.id != i + 1:
                 raise err(
@@ -195,6 +214,13 @@ class Puzzle:
                     f"rooms must be sorted by corner cell; "
                     f"room {room.id} corner {corner} follows {prev_corner}")
             prev_corner = corner
+            if not isinstance(room.name, str):
+                raise err(f"room {room.id}: name must be a string")
+            if room.name and room.name in seen_names:
+                raise err(f"duplicate room name {room.name!r}")
+            if room.name:
+                seen_names.add(room.name)
+            _check_forms(room.forms, f"room {room.id}", err)
 
         # objects --------------------------------------------------------
         obj_cells: set[Cell] = set()
@@ -244,17 +270,27 @@ class Puzzle:
                 raise err(
                     f"people[{i}]: expected id {expected_id!r}, "
                     f"got {person.id!r}")
-            expected_name = f"Подозреваемый_{i + 1}"
-            if person.name != expected_name:
-                raise err(
-                    f"{expected_id}: name must be {expected_name!r}, "
-                    f"got {person.name!r}")
         victim = self.people[-1]
         if victim.id != "victim":
             raise err(
                 f"last person must be the victim, got id {victim.id!r}")
-        if victim.name != "Убитый":
-            raise err(f"victim name must be 'Убитый', got {victim.name!r}")
+        # names are free-form since phase 5 (real Russian names from the
+        # generator pool; legacy "Подозреваемый_N" placeholders stay valid):
+        # non-empty and pairwise distinct, so clue texts stay unambiguous
+        names: set[str] = set()
+        for person in self.people:
+            if not isinstance(person.name, str) or not person.name:
+                raise err(
+                    f"{person.id}: name must be a non-empty string, "
+                    f"got {person.name!r}")
+            if person.name in names:
+                raise err(f"duplicate person name {person.name!r}")
+            names.add(person.name)
+            if person.gender not in ("", "m", "f"):
+                raise err(
+                    f"{person.id}: gender must be '', 'm' or 'f', "
+                    f"got {person.gender!r}")
+            _check_forms(person.forms, person.id, err)
         seed_max = 2 ** 32 - 1
         for person in self.people:
             if not _is_int(person.portrait_seed) \
@@ -324,7 +360,9 @@ class Puzzle:
             "width": self.width,
             "height": self.height,
             "rooms": [
-                {"id": room.id, "cells": cells(room.cells)}
+                {"id": room.id, "cells": cells(room.cells),
+                 **({"name": room.name} if room.name else {}),
+                 **({"forms": dict(room.forms)} if room.forms else {})}
                 for room in self.rooms
             ],
             "objects": [
@@ -332,7 +370,9 @@ class Puzzle:
                 for obj in self.objects
             ],
             "people": [
-                {"id": p.id, "name": p.name, "portrait_seed": p.portrait_seed}
+                {"id": p.id, "name": p.name, "portrait_seed": p.portrait_seed,
+                 **({"gender": p.gender} if p.gender else {}),
+                 **({"forms": dict(p.forms)} if p.forms else {})}
                 for p in self.people
             ],
             "clues": [dict(clue) for clue in self.clues],
@@ -351,9 +391,20 @@ class Puzzle:
         raw_rooms = _list_field(d, "rooms", "puzzle")
         rooms = []
         for i, raw in enumerate(raw_rooms):
-            _exact_keys(raw, {"id", "cells"}, f"rooms[{i}]")
+            # "name"/"forms" are optional (legacy puzzles pre-phase 5)
+            _optional_keys(raw, {"id", "cells"}, {"name", "forms"},
+                           f"rooms[{i}]")
             rid = _int_field(raw, "id", None, f"rooms[{i}]")
-            rooms.append(Room(rid, _cell_set(raw["cells"], f"rooms[{i}]")))
+            cells = _cell_set(raw["cells"], f"rooms[{i}]")
+            name = raw.get("name", "")
+            forms = raw.get("forms", {})
+            if not isinstance(name, str):
+                raise PuzzleValidationError(
+                    f"rooms[{i}].name must be a string")
+            if not isinstance(forms, dict):
+                raise PuzzleValidationError(
+                    f"rooms[{i}].forms must be an object")
+            rooms.append(Room(rid, cells, name, dict(forms)))
 
         raw_objects = _list_field(d, "objects", "puzzle")
         objects = []
@@ -372,7 +423,9 @@ class Puzzle:
         raw_people = _list_field(d, "people", "puzzle")
         people = []
         for i, raw in enumerate(raw_people):
-            _exact_keys(raw, {"id", "name", "portrait_seed"}, f"people[{i}]")
+            # "gender"/"forms" are optional (legacy puzzles pre-phase 5)
+            _optional_keys(raw, {"id", "name", "portrait_seed"},
+                           {"gender", "forms"}, f"people[{i}]")
             if not isinstance(raw["id"], str) or not raw["id"]:
                 raise PuzzleValidationError(
                     f"people[{i}].id must be a non-empty string")
@@ -383,7 +436,16 @@ class Puzzle:
             if not _is_int(seed):
                 raise PuzzleValidationError(
                     f"people[{i}].portrait_seed must be an integer")
-            people.append(Person(raw["id"], raw["name"], seed))
+            gender = raw.get("gender", "")
+            forms = raw.get("forms", {})
+            if not isinstance(gender, str):
+                raise PuzzleValidationError(
+                    f"people[{i}].gender must be a string")
+            if not isinstance(forms, dict):
+                raise PuzzleValidationError(
+                    f"people[{i}].forms must be an object")
+            people.append(Person(raw["id"], raw["name"], seed, gender,
+                                 dict(forms)))
 
         raw_clues = _list_field(d, "clues", "puzzle")
         clues = []
@@ -469,6 +531,40 @@ def _exact_keys(d: dict, expected: set[str], where: str) -> None:
     missing = expected - set(d)
     if missing:
         raise PuzzleValidationError(f"{where}: missing fields {sorted(missing)}")
+
+
+def _optional_keys(d: dict, required: set[str], optional: set[str],
+                   where: str) -> None:
+    """Strict keys with an optional subset (legacy entries pre-phase 5)."""
+    if not isinstance(d, dict):
+        raise PuzzleValidationError(f"{where} must be an object")
+    extra = set(d) - required - optional
+    if extra:
+        raise PuzzleValidationError(
+            f"{where}: unexpected fields {sorted(extra)}")
+    missing = required - set(d)
+    if missing:
+        raise PuzzleValidationError(f"{where}: missing fields {sorted(missing)}")
+
+
+# inflected-form keys allowed in Room/Person ``forms`` dicts (SPEC §4)
+_FORM_KEYS = frozenset({"gen", "prep"})
+
+
+def _check_forms(forms: dict, where: str, err) -> None:
+    """Raise ``err`` unless ``forms`` maps a subset of {"gen", "prep"} to
+    non-empty strings."""
+    if not isinstance(forms, dict):
+        raise err(f"{where}: forms must be an object, "
+                  f"got {type(forms).__name__}")
+    bad = set(forms) - _FORM_KEYS
+    if bad:
+        raise err(f"{where}: unknown form keys {sorted(bad)}")
+    for key, value in forms.items():
+        if not isinstance(value, str) or not value:
+            raise err(
+                f"{where}: forms[{key!r}] must be a non-empty string, "
+                f"got {value!r}")
 
 
 def _int_field(d: dict, key: str, minimum: int | None, where: str) -> int:

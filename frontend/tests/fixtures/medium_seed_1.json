@@ -7,167 +7,161 @@
       "cells": [
         {
           "r": 0,
-          "c": 0
+          "c": 2
         },
         {
           "r": 0,
-          "c": 1
+          "c": 3
         },
         {
           "r": 0,
+          "c": 4
+        },
+        {
+          "r": 0,
+          "c": 5
+        },
+        {
+          "r": 0,
+          "c": 6
+        },
+        {
+          "r": 1,
           "c": 2
         },
         {
           "r": 1,
-          "c": 0
+          "c": 3
         },
         {
           "r": 1,
-          "c": 1
+          "c": 4
+        },
+        {
+          "r": 1,
+          "c": 5
         },
         {
           "r": 2,
-          "c": 0
-        },
-        {
-          "r": 2,
-          "c": 1
-        },
-        {
-          "r": 3,
-          "c": 1
-        },
-        {
-          "r": 3,
-          "c": 2
+          "c": 5
         }
-      ]
+      ],
+      "name": "Балкон",
+      "forms": {
+        "gen": "балкона",
+        "prep": "балконе"
+      }
     },
     {
       "id": 2,
       "cells": [
         {
-          "r": 0,
-          "c": 3
-        },
-        {
-          "r": 0,
-          "c": 4
-        },
-        {
-          "r": 0,
-          "c": 5
-        },
-        {
-          "r": 0,
-          "c": 6
-        },
-        {
-          "r": 1,
-          "c": 3
-        },
-        {
-          "r": 1,
-          "c": 4
-        },
-        {
-          "r": 1,
-          "c": 5
-        },
-        {
           "r": 1,
           "c": 6
         },
         {
           "r": 2,
           "c": 6
+        },
+        {
+          "r": 3,
+          "c": 5
+        },
+        {
+          "r": 3,
+          "c": 6
+        },
+        {
+          "r": 4,
+          "c": 5
+        },
+        {
+          "r": 4,
+          "c": 6
+        },
+        {
+          "r": 5,
+          "c": 5
+        },
+        {
+          "r": 5,
+          "c": 6
         }
-      ]
+      ],
+      "name": "Ванная",
+      "forms": {
+        "gen": "ванной",
+        "prep": "ванной"
+      }
     },
     {
       "id": 3,
       "cells": [
         {
+          "r": 2,
+          "c": 2
+        },
+        {
+          "r": 2,
+          "c": 3
+        },
+        {
+          "r": 2,
+          "c": 4
+        },
+        {
           "r": 3,
-          "c": 0
+          "c": 2
+        },
+        {
+          "r": 3,
+          "c": 3
+        },
+        {
+          "r": 3,
+          "c": 4
         },
         {
           "r": 4,
-          "c": 0
+          "c": 3
         },
         {
           "r": 4,
-          "c": 1
+          "c": 4
         },
         {
           "r": 5,
-          "c": 0
+          "c": 3
         },
         {
           "r": 5,
-          "c": 1
-        },
-        {
-          "r": 6,
-          "c": 0
-        },
-        {
-          "r": 6,
-          "c": 1
+          "c": 4
         }
-      ]
+      ],
+      "name": "Коридор",
+      "forms": {
+        "gen": "коридора",
+        "prep": "коридоре"
+      }
     },
     {
       "id": 4,
       "cells": [
         {
-          "r": 3,
-          "c": 6
-        },
-        {
-          "r": 4,
-          "c": 6
-        },
-        {
           "r": 5,
-          "c": 4
-        },
-        {
-          "r": 5,
-          "c": 5
-        },
-        {
-          "r": 5,
-          "c": 6
-        },
-        {
-          "r": 6,
-          "c": 5
-        },
-        {
-          "r": 6,
-          "c": 6
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "cells": [
-        {
-          "r": 4,
-          "c": 2
-        },
-        {
-          "r": 4,
-          "c": 3
+          "c": 0
         },
         {
           "r": 5,
           "c": 2
         },
         {
-          "r": 5,
-          "c": 3
+          "r": 6,
+          "c": 0
+        },
+        {
+          "r": 6,
+          "c": 1
         },
         {
           "r": 6,
@@ -180,8 +174,21 @@
         {
           "r": 6,
           "c": 4
+        },
+        {
+          "r": 6,
+          "c": 5
+        },
+        {
+          "r": 6,
+          "c": 6
         }
-      ]
+      ],
+      "name": "Мансарда",
+      "forms": {
+        "gen": "мансарды",
+        "prep": "мансарде"
+      }
     }
   ],
   "objects": [
@@ -190,118 +197,52 @@
       "type": "armchair",
       "cells": [
         {
-          "r": 1,
-          "c": 1
-        }
-      ]
-    },
-    {
-      "id": "obj_2",
-      "type": "wardrobe",
-      "cells": [
-        {
           "r": 6,
-          "c": 5
-        }
-      ]
-    },
-    {
-      "id": "obj_3",
-      "type": "sofa",
-      "cells": [
-        {
-          "r": 6,
-          "c": 1
-        }
-      ]
-    },
-    {
-      "id": "obj_4",
-      "type": "armchair",
-      "cells": [
-        {
-          "r": 0,
-          "c": 0
-        }
-      ]
-    },
-    {
-      "id": "obj_5",
-      "type": "fridge",
-      "cells": [
-        {
-          "r": 4,
-          "c": 6
-        }
-      ]
-    },
-    {
-      "id": "obj_6",
-      "type": "fridge",
-      "cells": [
-        {
-          "r": 4,
-          "c": 3
-        }
-      ]
-    },
-    {
-      "id": "obj_7",
-      "type": "sofa",
-      "cells": [
-        {
-          "r": 1,
-          "c": 3
-        }
-      ]
-    },
-    {
-      "id": "obj_8",
-      "type": "sofa",
-      "cells": [
-        {
-          "r": 5,
           "c": 4
         }
       ]
     },
     {
-      "id": "obj_9",
-      "type": "table",
+      "id": "obj_2",
+      "type": "bed",
       "cells": [
         {
-          "r": 1,
-          "c": 5
+          "r": 2,
+          "c": 3
+        },
+        {
+          "r": 3,
+          "c": 3
         }
       ]
     },
     {
-      "id": "obj_10",
-      "type": "carpet",
+      "id": "obj_3",
+      "type": "wardrobe",
       "cells": [
         {
-          "r": 6,
+          "r": 3,
+          "c": 4
+        }
+      ]
+    },
+    {
+      "id": "obj_4",
+      "type": "fridge",
+      "cells": [
+        {
+          "r": 5,
           "c": 6
         }
       ]
     },
     {
-      "id": "obj_11",
-      "type": "sofa",
+      "id": "obj_5",
+      "type": "tv",
       "cells": [
         {
-          "r": 5,
-          "c": 5
-        }
-      ]
-    },
-    {
-      "id": "obj_12",
-      "type": "armchair",
-      "cells": [
-        {
-          "r": 5,
-          "c": 3
+          "r": 0,
+          "c": 2
         }
       ]
     }
@@ -309,108 +250,116 @@
   "people": [
     {
       "id": "suspect_1",
-      "name": "Подозреваемый_1",
-      "portrait_seed": 1705135754
+      "name": "Фёдор",
+      "portrait_seed": 477461402,
+      "gender": "m",
+      "forms": {
+        "gen": "Фёдора",
+        "prep": "Фёдоре"
+      }
     },
     {
       "id": "suspect_2",
-      "name": "Подозреваемый_2",
-      "portrait_seed": 1380274340
+      "name": "Кира",
+      "portrait_seed": 4047344524,
+      "gender": "f",
+      "forms": {
+        "gen": "Киры",
+        "prep": "Кире"
+      }
     },
     {
       "id": "suspect_3",
-      "name": "Подозреваемый_3",
-      "portrait_seed": 2114676515
+      "name": "Пётр",
+      "portrait_seed": 1396880337,
+      "gender": "m",
+      "forms": {
+        "gen": "Петра",
+        "prep": "Петре"
+      }
     },
     {
       "id": "suspect_4",
-      "name": "Подозреваемый_4",
-      "portrait_seed": 3988333784
+      "name": "Дарья",
+      "portrait_seed": 1922970826,
+      "gender": "f",
+      "forms": {
+        "gen": "Дарьи",
+        "prep": "Дарье"
+      }
     },
     {
       "id": "suspect_5",
-      "name": "Подозреваемый_5",
-      "portrait_seed": 429385971
+      "name": "Софья",
+      "portrait_seed": 3910593166,
+      "gender": "f",
+      "forms": {
+        "gen": "Софьи",
+        "prep": "Софье"
+      }
     },
     {
       "id": "suspect_6",
-      "name": "Подозреваемый_6",
-      "portrait_seed": 4103071699
+      "name": "Игорь",
+      "portrait_seed": 2929105227,
+      "gender": "m",
+      "forms": {
+        "gen": "Игоря",
+        "prep": "Игоре"
+      }
     },
     {
       "id": "victim",
-      "name": "Убитый",
-      "portrait_seed": 802133526
+      "name": "Борис",
+      "portrait_seed": 2908532009,
+      "gender": "m",
+      "forms": {
+        "gen": "Бориса",
+        "prep": "Борисе"
+      }
     }
   ],
   "clues": [
     {
-      "kind": "not_on",
+      "kind": "adjacent",
       "person": "suspect_1",
-      "object_type": "armchair"
+      "object_type": "wardrobe"
     },
     {
-      "kind": "not_on",
+      "kind": "adjacent",
       "person": "suspect_2",
-      "object_type": "sofa"
+      "object_type": "bed"
     },
     {
-      "kind": "not_on",
+      "kind": "not_adjacent",
+      "person": "suspect_4",
+      "object_type": "tv"
+    },
+    {
+      "kind": "room_has_object",
       "person": "suspect_3",
       "object_type": "armchair"
-    },
-    {
-      "kind": "adjacent",
-      "person": "suspect_4",
-      "object_type": "sofa"
-    },
-    {
-      "kind": "adjacent",
-      "person": "suspect_4",
-      "object_type": "table"
-    },
-    {
-      "kind": "not_adjacent",
-      "person": "suspect_2",
-      "object_type": "fridge"
-    },
-    {
-      "kind": "not_adjacent",
-      "person": "suspect_6",
-      "object_type": "sofa"
     },
     {
       "kind": "room_not_has_object",
-      "person": "suspect_3",
-      "object_type": "sofa"
+      "person": "suspect_5",
+      "object_type": "tv"
     },
     {
-      "kind": "west",
-      "person": "suspect_1",
+      "kind": "north",
+      "person": "suspect_5",
       "person2": "suspect_2"
     },
     {
-      "kind": "same_room",
-      "person": "suspect_1",
-      "person2": "suspect_5"
+      "kind": "west",
+      "person": "suspect_6",
+      "person2": "suspect_3"
     },
     {
       "kind": "room_count",
       "room": 1,
       "count": 1,
-      "op": "gt"
-    },
-    {
-      "kind": "room_count",
-      "room": 2,
-      "count": 1,
-      "op": "ne"
-    },
-    {
-      "kind": "room_count",
-      "room": 3,
-      "count": 1,
-      "op": "ge"
+      "op": "le"
     }
   ]
 }

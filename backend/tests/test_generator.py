@@ -192,6 +192,27 @@ def test_people_count_equals_board_size():
         assert len({c for _, c in cells}) == size
 
 
+def test_people_and_rooms_have_curated_names():
+    """ideas.md v2 names: distinct real names with gender and explicit case
+    forms; room names are distinct too (ideas.md phase 5)."""
+    for difficulty, seed in (("easy", 3), ("medium", 1), ("hard", 1),
+                             ("expert", 1)):
+        puzzle = generate(seed, difficulty).puzzle
+        people = puzzle.people
+        names = [p.name for p in people]
+        assert len(set(names)) == len(names), f"{difficulty}/{seed}: dup name"
+        assert all(p.name for p in people)
+        assert all(p.gender in ("m", "f") for p in people)
+        for p in people:
+            assert set(p.forms) == {"gen", "prep"}
+            assert all(p.forms.values())
+        room_names = [r.name for r in puzzle.rooms]
+        assert len(set(room_names)) == len(room_names)
+        for room in puzzle.rooms:
+            if room.name:
+                assert room.forms.get("gen") and room.forms.get("prep")
+
+
 def test_solution_satisfies_rules_independently():
     """The generated placement satisfies SPEC §3 without using the solver:
     distinct rows/cols, allowed cells only, murder room = victim + exactly

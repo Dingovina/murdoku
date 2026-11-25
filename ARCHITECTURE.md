@@ -75,6 +75,8 @@ OBJECT_TYPE_IDS: tuple[str, ...]
 class Room:
     id: int                       # 1..R, dense, sorted by corner cell (SPEC §1)
     cells: frozenset[Cell]
+    name: str = ""                # display nominative ("Спальня"); "" = unnamed
+    forms: dict = ...             # {"gen", "prep"}; display metadata only
     @property
     def corner(self) -> Cell      # min (r, c) lexicographic
 
@@ -87,8 +89,10 @@ class ObjectInstance:
 @dataclass(frozen=True)
 class Person:
     id: str                       # "suspect_1".. "suspect_{N-1}", victim id == "victim"
-    name: str                     # "Подозреваемый_N" / "Убитый"
+    name: str                     # real Russian name (curated pool) or legacy placeholder
     portrait_seed: int            # 0 .. 2**32-1
+    gender: str = ""              # "" | "m" | "f"
+    forms: dict = ...             # {"gen", "prep"}; display metadata only
 
 @dataclass(frozen=True)
 class Puzzle:
@@ -132,7 +136,10 @@ Registry (ids are English; RU display forms are a frontend concern, see §5):
 - objects: known type; cells pairwise disjoint across all objects; all cells of an
   instance in one room; bed == 2 orth-adjacent cells; object ids dense `obj_i`;
 - people: ≥ 3; suspect ids `suspect_1..suspect_{N-1}` in order; exactly one `victim`
-  last; portrait_seed in `0..2**32-1`; names match ids (`Подозреваемый_N`, `Убитый`);
+  last; portrait_seed in `0..2**32-1`; names are non-empty and pairwise distinct
+  (format is free — real names or legacy placeholders); `gender ∈ {"", "m", "f"}`;
+  `forms` maps a subset of {gen, prep} to non-empty strings; room names are
+  distinct when non-empty;
 - clues: kind in the whitelist; only the allowed fields present with correct types;
   referenced room id / person ids / object_type exist; `person != person2`;
   `count >= 0`; `op ∈ {eq,ne,gt,ge,lt,le}`.

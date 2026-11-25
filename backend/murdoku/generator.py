@@ -64,6 +64,51 @@ _FULL_TYPE_IDS = tuple(
 _PARTIAL_TYPE_IDS = tuple(
     t for t in OBJECT_TYPE_IDS if OBJECT_TYPES[t].cls == PARTIAL)
 
+# Curated Russian name pools (ideas.md v2 names).  Case forms travel in the
+# puzzle JSON explicitly — the frontend never inflects (ё, Пётр→Петра …).
+# People: (name, gender, genitive, prepositional); rooms are always feminine
+# or masculine nouns: (name, genitive, prepositional).  Pools must cover the
+# difficulty maxima: 9 people (expert size), 15 playable rooms (expert
+# rooms range 7..16 minus up to 1 void).
+_PEOPLE_NAMES: tuple[tuple[str, str, str, str], ...] = (
+    ("Анна", "f", "Анны", "Анне"),
+    ("Борис", "m", "Бориса", "Борисе"),
+    ("Вера", "f", "Веры", "Вере"),
+    ("Григорий", "m", "Григория", "Григории"),
+    ("Дарья", "f", "Дарьи", "Дарье"),
+    ("Егор", "m", "Егора", "Егоре"),
+    ("Жанна", "f", "Жанны", "Жанне"),
+    ("Игорь", "m", "Игоря", "Игоре"),
+    ("Кира", "f", "Киры", "Кире"),
+    ("Матвей", "m", "Матвея", "Матвее"),
+    ("Нина", "f", "Нины", "Нине"),
+    ("Олег", "m", "Олега", "Олеге"),
+    ("Ольга", "f", "Ольги", "Ольге"),
+    ("Пётр", "m", "Петра", "Петре"),
+    ("Софья", "f", "Софьи", "Софье"),
+    ("Фёдор", "m", "Фёдора", "Фёдоре"),
+    ("Тамара", "f", "Тамары", "Тамаре"),
+    ("Эмма", "f", "Эммы", "Эмме"),
+)
+_ROOM_NAMES: tuple[tuple[str, str, str], ...] = (
+    ("Спальня", "спальни", "спальне"),
+    ("Гостиная", "гостиной", "гостиной"),
+    ("Кухня", "кухни", "кухне"),
+    ("Кабинет", "кабинета", "кабинете"),
+    ("Столовая", "столовой", "столовой"),
+    ("Прихожая", "прихожей", "прихожей"),
+    ("Ванная", "ванной", "ванной"),
+    ("Библиотека", "библиотеки", "библиотеке"),
+    ("Оранжерея", "оранжереи", "оранжерее"),
+    ("Балкон", "балкона", "балконе"),
+    ("Коридор", "коридора", "коридоре"),
+    ("Кладовая", "кладовой", "кладовой"),
+    ("Терраса", "террасы", "террасе"),
+    ("Мансарда", "мансарды", "мансарде"),
+    ("Холл", "холла", "холле"),
+    ("Чулан", "чулана", "чулане"),
+)
+
 
 class GenerationError(RuntimeError):
     """Raised when all outer attempts failed (practically never happens)."""
@@ -208,9 +253,21 @@ def _make_rooms(rng: Random, size: int, n_playable: int, x_voids: int):
         remaining = [region for region in regions
                      if region.isdisjoint(void_cells)]
         remaining.sort(key=min)
-        rooms = tuple(Room(i + 1, frozenset(region))
-                      for i, region in enumerate(remaining))
-        return rooms
+        # ideas.md v2 names: draw curated room names without replacement, in
+        # room-id order (the stream continues across attempts — determinism
+        # is untouched).  The pool covers the 15-room maximum; the ""-named
+        # fallback is dead code kept for pool-size safety.
+        drawn = rng.sample(_ROOM_NAMES,
+                           min(len(remaining), len(_ROOM_NAMES)))
+        rooms = []
+        for i, region in enumerate(remaining):
+            if i < len(drawn):
+                nom, gen, prep = drawn[i]
+                rooms.append(Room(i + 1, frozenset(region), nom,
+                                  {"gen": gen, "prep": prep}))
+            else:
+                rooms.append(Room(i + 1, frozenset(region)))
+        return tuple(rooms)
     return None
 
 
@@ -456,11 +513,16 @@ def _has_row_col_pair(cells: list[Cell]) -> bool:
 
 
 def _make_people(rng: Random, n_people: int) -> tuple[Person, ...]:
-    """Suspects in numeric order, then the victim; 32-bit portrait seeds."""
-    people = [Person(f"suspect_{i}", f"Подозреваемый_{i}",
-                     rng.getrandbits(32))
-              for i in range(1, n_people)]
-    people.append(Person("victim", "Убитый", rng.getrandbits(32)))
+    """Suspects in numeric order, then the victim; curated Russian names
+    drawn without replacement (ideas.md v2 names), 32-bit portrait seeds."""
+    chosen = rng.sample(_PEOPLE_NAMES, n_people)
+    people = []
+    for i, (name, gender, gen, prep) in enumerate(chosen[:-1]):
+        people.append(Person(f"suspect_{i + 1}", name, rng.getrandbits(32),
+                             gender, {"gen": gen, "prep": prep}))
+    name, gender, gen, prep = chosen[-1]
+    people.append(Person("victim", name, rng.getrandbits(32),
+                         gender, {"gen": gen, "prep": prep}))
     return tuple(people)
 
 
