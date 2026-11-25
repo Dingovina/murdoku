@@ -340,8 +340,15 @@ async function accuse() {
     const result = await checkAnswer(state.token, placements, accusationId);
     if (result.won) {
       state.solved = true;
-      state.board.showSolution(result.solution);
-      setStatus('');
+      if (result.alternative) {
+        // Alternative-but-valid arrangement: keep the player's board on
+        // screen instead of overwriting it with the server's solution.
+        const killer = personById(accusationId);
+        setStatus(`Расстановка верна (альтернативная). Убийца — ${killer ? killer.name : accusationId}.`);
+      } else {
+        state.board.showSolution(result.solution);
+        setStatus('');
+      }
       showOverlay(accusationId);
     } else if (result.misplaced_person_id) {
       state.board.clearMisplaced();

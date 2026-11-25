@@ -3,6 +3,7 @@ generator: /api/puzzle runs against a stub module injected into
 ``sys.modules["murdoku.generator"]`` (the deferred-import seam).
 """
 
+import json
 import re
 import sys
 import types
@@ -11,6 +12,8 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
+from murdoku.clue_truth import unique_killer
+from murdoku.generator import generate
 from murdoku.model import Person, Puzzle, Room
 from murdoku.server import tokens
 from murdoku.server.app import app
@@ -391,6 +394,142 @@ def test_solution_reveal_token_with_malformed_solution(client):
     response = client.get("/api/solution", params={"token": malformed})
     assert response.status_code == 400
     assert "solution/killer_id" in response.json()["error"]
+
+
+# ----------------------------------------------------------------------
+# Alternative-solution validation (ideas.md): a different-but-valid
+# placement wins and is logged for generator-bug hunting.
+# ----------------------------------------------------------------------
+
+
+def _alt_scenario():
+    """A real generated puzzle, a kept clue whose removal yields exactly
+    two solutions, the alternative placement, and a hand-built token whose
+    embedded puzzle deliberately lacks that clue (non-unique)."""
+    result = generate(2, "easy")
+    puzzle, solution = result.puzzle, result.solution
+    killer = next(pid for pid in puzzle.suspect_ids()
+                  if puzzle.room_of(solution[pid])
+                  is puzzle.room_of(solution["victim"]))
+    weakened = None
+    for clue in puzzle.clues:
+        rest = tuple(c for c in puzzle.clues if c != clue)
+        probe = Puzzle(puzzle.width, puzzle.height, puzzle.rooms,
+                       puzzle.objects, puzzle.people, rest)
+        if solver.count_solutions(probe, 3) == 2:
+            weakened = probe
+            break
+    assert weakened is not None, "no kept clue gives exactly two solutions"
+    alts = [s for s in solver.solutions(weakened, 2) if s != solution]
+    assert len(alts) == 1
+    alt = alts[0]
+
+    def token_with(puzzle_to_embed):
+        return tokens.make_token({
+            "game_id": "0" * 32,
+            "difficulty": "easy",
+            "seed": 2,
+            "solution": {pid: [r, c] for pid, (r, c) in solution.items()},
+            "killer_id": killer,
+            "puzzle": puzzle_to_embed.to_dict(),
+        })
+
+    return solution, killer, alt, weakened, token_with
+
+
+def _placements_of(placement: dict) -> list[dict]:
+    return [{"person_id": pid, "r": r, "c": c}
+            for pid, (r, c) in placement.items()]
+
+
+def test_check_alternative_solution_wins_and_is_logged(client, monkeypatch,
+                                                       tmp_path):
+    monkeypatch.setenv("MURDOKU_DATA_DIR", str(tmp_path))
+    solution, killer, alt, weakened, token_with = _alt_scenario()
+    user_killer = unique_killer(weakened, alt)
+    assert user_killer is not None
+
+    response = client.post("/api/check", json={
+        "token": token_with(weakened),
+        "placements": _placements_of(alt),
+        "accusation": user_killer,
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["won"] is True
+    assert body["alternative"] is True
+    assert body["solution"] == {pid: [r, c]
+                                for pid, (r, c) in solution.items()}
+
+    lines = (tmp_path / "alt_wins.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["seed"] == 2
+    assert record["difficulty"] == "easy"
+    assert record["clues"] == [dict(c) for c in weakened.clues]
+    assert record["user_solution"] == {pid: [r, c]
+                                       for pid, (r, c) in alt.items()}
+    assert record["server_solution"] == {pid: [r, c]
+                                         for pid, (r, c) in solution.items()}
+    assert record["accusation"] == user_killer
+    assert record["inferred_killer"] == user_killer
+
+
+def test_check_alternative_valid_but_wrong_accusation(client):
+    """A valid alternative arrangement with an accusation that is NOT the
+    inferred killer of that arrangement is not a win."""
+    solution, killer, alt, weakened, token_with = _alt_scenario()
+    user_killer = unique_killer(weakened, alt)
+    other = next(pid for pid in weakened.suspect_ids() if pid != user_killer)
+    response = client.post("/api/check", json={
+        "token": token_with(weakened),
+        "placements": _placements_of(alt),
+        "accusation": other,
+    })
+    assert response.status_code == 200
+    assert response.json() == {"won": False, "correct_accusation": False}
+
+
+def test_check_same_alternative_against_full_set_is_misplaced(client):
+    """The alternative violates the dropped clue, so against the FULL kept
+    set it is just an invalid arrangement -> legacy misplaced response."""
+    result = generate(2, "easy")
+    puzzle, solution = result.puzzle, result.solution
+    killer = next(pid for pid in puzzle.suspect_ids()
+                  if puzzle.room_of(solution[pid])
+                  is puzzle.room_of(solution["victim"]))
+    _, _, alt, _, token_with = _alt_scenario()
+    response = client.post("/api/check", json={
+        "token": token_with(puzzle),
+        "placements": _placements_of(alt),
+        "accusation": killer,
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["won"] is False
+    assert set(body) == {"won", "misplaced_person_id"}
+
+
+def test_check_token_without_puzzle_keeps_legacy_behavior(client):
+    """Old tokens (no embedded puzzle) fall back to exact-match only: the
+    alternative arrangement is a plain misplaced response."""
+    solution, killer, alt, _, token_with = _alt_scenario()
+    legacy = tokens.make_token({
+        "game_id": "0" * 32,
+        "difficulty": "easy",
+        "seed": 2,
+        "solution": {pid: [r, c] for pid, (r, c) in solution.items()},
+        "killer_id": killer,
+    })
+    response = client.post("/api/check", json={
+        "token": legacy,
+        "placements": _placements_of(alt),
+        "accusation": "suspect_1",
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["won"] is False
+    assert set(body) == {"won", "misplaced_person_id"}
 
 
 # ----------------------------------------------------------------------

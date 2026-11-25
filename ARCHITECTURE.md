@@ -281,11 +281,22 @@ def generate(seed: int, difficulty: str) -> GenerationResult
   - `200 {"won": false, "correct_accusation": false}` — all placements correct,
     accusation wrong.
 - Token: Fernet, key = `urlsafe_b64encode(sha256(MURDOKU_SECRET).digest())`;
-  payload `{"game_id": uuid4-hex, "difficulty": str, "solution": {pid: [r,c]},
-  "killer_id": suspect-id}` — `/api/check` is stateless, so the killer id travels
-  in the token (the server has no puzzle there to recompute rooms).
+  payload `{"game_id": uuid4-hex, "difficulty": str, "seed": int, "solution":
+  {pid: [r,c]}, "killer_id": suspect-id, "puzzle": <SPEC §4 puzzle dict>}` —
+  `/api/check` is stateless, so the killer id travels in the token (the server has
+  no puzzle there to recompute rooms); the embedded puzzle dict enables
+  alternative-solution validation for placements that differ from the embedded
+  solution. Tokens without `"puzzle"` (pre-feature) fall back to exact-match only.
   `MURDOKU_SECRET` required; if unset and `MURDOKU_DEV=1` → random per-process key +
   stderr warning (tokens die on restart); if unset otherwise → refuse to start.
+- Alternative wins (ideas.md): when placements differ from the token solution but
+  satisfy ALL clues and SPEC §3 (`murdoku/clue_truth.py` — canonical evaluator;
+  `Puzzle.from_dict` on the embedded dict) and the accusation equals the killer
+  inferred from the USER's arrangement → `200 {"won": true, "solution": ...,
+  "alternative": true}`; otherwise every legacy response is byte-identical.
+  Such a win implies a generator/validation bug, so it is appended to
+  `<MURDOKU_DATA_DIR>/alt_wins.jsonl` (default `data/`; IO errors are swallowed
+  with a stderr warning and never affect the response).
 - `GET /api/solution?token=...` → `200 {"solution": {pid: [r,c]}, "killer_id"}` —
   reveal endpoint (the player gives up); missing/invalid token or a token without
   solution/killer_id → `400 {"error"}`. Stateless: data comes from the token.

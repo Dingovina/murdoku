@@ -15,9 +15,12 @@ re-imports on every request.
 """
 
 import json
+import os
 import secrets
+import sys
 import uuid
 from collections.abc import Iterable
+from datetime import datetime, timezone
 from pathlib import Path
 
 from starlette.applications import Starlette
@@ -26,6 +29,8 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from .. import clue_truth
+from ..model import Puzzle
 from . import tokens
 
 DIFFICULTIES = ("easy", "medium", "hard", "expert")
@@ -227,11 +232,68 @@ async def api_check(request: Request) -> JSONResponse:
 
     wrong = [pid for pid in _people_order(people_ids)
              if placed[pid] != solution[pid]]
+    if wrong and isinstance(payload.get("puzzle"), dict):
+        alt = _alternative_check(payload, placed, accusation, solution)
+        if alt is not None:
+            return alt
     if wrong:
         return JSONResponse({"won": False, "misplaced_person_id": wrong[0]})
     if accusation == killer_id:
         return JSONResponse({"won": True, "solution": solution})
     return JSONResponse({"won": False, "correct_accusation": False})
+
+
+def _alternative_check(payload: dict, placed: dict, accusation: str,
+                       solution: dict) -> JSONResponse | None:
+    """Alternative-solution validation (ideas.md): a placement DIFFERENT from
+    the server's but satisfying every clue and the SPEC §3 rules is a win,
+    judged against the user's own arrangement — the inferred killer is the
+    suspect alone with the victim in THAT arrangement, and the accusation is
+    compared to it.  Such a win can only stem from a generator/validation
+    bug (generated puzzles are unique), so it is granted AND logged for bug
+    hunting.  Returns None to fall through to the legacy exact-match
+    responses when the token carries no puzzle or the arrangement is
+    invalid — every pre-existing outcome stays byte-identical.
+    """
+    try:
+        puzzle = Puzzle.from_dict(payload["puzzle"])
+        placement = {pid: (cell[0], cell[1]) for pid, cell in placed.items()}
+        ctx = clue_truth.TruthContext(puzzle)
+        user_killer = clue_truth.unique_killer(puzzle, placement)
+        if not (ctx.rules_ok(placement) and ctx.all_clues_hold(placement)
+                and user_killer is not None):
+            return None
+    except Exception:
+        # malformed embedded puzzle or clue data -> legacy behavior
+        return None
+    if accusation != user_killer:
+        return JSONResponse({"won": False, "correct_accusation": False})
+    _log_alt_win(payload, placement, accusation, user_killer)
+    return JSONResponse({"won": True, "solution": solution, "alternative": True})
+
+
+def _log_alt_win(payload: dict, placement: dict, accusation: str,
+                 inferred_killer: str) -> None:
+    """Append an alternative-win record (JSONL) for generator-bug hunting.
+    IO failures must never affect the response (ideas.md decision)."""
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "game_id": payload.get("game_id"),
+        "seed": payload.get("seed"),
+        "difficulty": payload.get("difficulty"),
+        "clues": payload.get("puzzle", {}).get("clues", []),
+        "user_solution": {pid: [r, c] for pid, (r, c) in placement.items()},
+        "server_solution": payload.get("solution"),
+        "accusation": accusation,
+        "inferred_killer": inferred_killer,
+    }
+    try:
+        data_dir = Path(os.environ.get("MURDOKU_DATA_DIR", "data"))
+        data_dir.mkdir(parents=True, exist_ok=True)
+        with (data_dir / "alt_wins.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        print(f"warning: could not log alternative win: {exc}", file=sys.stderr)
 
 
 async def api_solution(request: Request) -> JSONResponse:
