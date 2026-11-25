@@ -45,12 +45,14 @@ from .solver import count_solutions
 Cell = tuple[int, int]
 
 # Difficulty parameters per SPEC §6; the "rooms" range counts rooms INCLUDING
-# the voids — playable rooms = drawn value minus x (SPEC §6 step 1).
+# the voids — playable rooms = drawn value minus x (SPEC §6 step 1).  People
+# count equals the board size: one person per row and per column (ideas.md —
+# sudoku spirit; also makes the victim-lock invariant automatic).
 DIFFICULTY_PARAMS: dict[str, dict] = {
-    "easy":   {"size": 6, "people": (4, 5), "objects": (6, 10), "rooms": (3, 5)},
-    "medium": {"size": 7, "people": (5, 7), "objects": (5, 15), "rooms": (5, 10)},
-    "hard":   {"size": 8, "people": (6, 8), "objects": (7, 19), "rooms": (6, 13)},
-    "expert": {"size": 9, "people": (7, 9), "objects": (8, 24), "rooms": (7, 16)},
+    "easy":   {"size": 6, "people": (6, 6), "objects": (6, 10), "rooms": (3, 5)},
+    "medium": {"size": 7, "people": (7, 7), "objects": (5, 15), "rooms": (5, 10)},
+    "hard":   {"size": 8, "people": (8, 8), "objects": (7, 19), "rooms": (6, 13)},
+    "expert": {"size": 9, "people": (9, 9), "objects": (8, 24), "rooms": (7, 16)},
 }
 DIFFICULTIES: tuple[str, ...] = tuple(DIFFICULTY_PARAMS)
 
@@ -143,6 +145,12 @@ def _attempt(rng: Random, params: dict):
     objects = _make_objects(rng, room_index, playable, n_objects, n_people)
     if objects is None:
         return None
+    # every playable room holds at least one object instance (ideas.md):
+    # a bare room would be undescriptive and clue-starved
+    rooms_with_objects = {room_index[cell].id
+                          for obj in objects for cell in obj.cells}
+    if rooms_with_objects != {room.id for room in rooms}:
+        return None
     allowed = _allowed_cells(room_index, objects)
 
     placement = _place_people(rng, rooms, room_index, allowed, n_people)
@@ -160,6 +168,11 @@ def _attempt(rng: Random, params: dict):
     if count_solutions(full_puzzle, 2) != 1:
         return None
     kept = prune_clues(full_puzzle, full, rng)
+    # every suspect must appear in at least one kept clue (ideas.md): a
+    # suspect referenced by nothing is unconstrained trivia for the player
+    mentioned = {clue["person"] for clue in kept if "person" in clue}
+    if not set(skeleton.suspect_ids()) <= mentioned:
+        return None
     final = Puzzle(size, size, rooms, objects, people, tuple(kept))
     if count_solutions(final, 2) != 1:
         # kept is unique by construction (every drop was verified against

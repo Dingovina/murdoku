@@ -33,10 +33,10 @@ BUDGET_MS = 3000.0  # SPEC §6: expert generation < 3 s on average
 # ----------------------------------------------------------------------
 
 RANGES = {
-    "easy":   {"size": 6, "people": (4, 5), "objects": (6, 10), "rooms": (3, 5)},
-    "medium": {"size": 7, "people": (5, 7), "objects": (5, 15), "rooms": (5, 10)},
-    "hard":   {"size": 8, "people": (6, 8), "objects": (7, 19), "rooms": (6, 13)},
-    "expert": {"size": 9, "people": (7, 9), "objects": (8, 24), "rooms": (7, 16)},
+    "easy":   {"size": 6, "people": (6, 6), "objects": (6, 10), "rooms": (3, 5)},
+    "medium": {"size": 7, "people": (7, 7), "objects": (5, 15), "rooms": (5, 10)},
+    "hard":   {"size": 8, "people": (8, 8), "objects": (7, 19), "rooms": (6, 13)},
+    "expert": {"size": 9, "people": (9, 9), "objects": (8, 24), "rooms": (7, 16)},
 }
 
 
@@ -159,6 +159,37 @@ def test_full_set_contains_c1_pairs():
     n_s = len(result.puzzle.suspect_ids())
     directions = [c for c in full if c["kind"] in ("south", "north", "east", "west")]
     assert len(directions) == n_s * (n_s - 1) * 2
+
+
+def test_every_playable_room_has_an_object():
+    """ideas.md invariant: no bare rooms — every playable room holds at
+    least one object instance."""
+    for difficulty, seed in (("easy", 3), ("medium", 1), ("hard", 1)):
+        puzzle = generate(seed, difficulty).puzzle
+        rooms_with = {puzzle.room_of(next(iter(obj.cells))).id
+                      for obj in puzzle.objects}
+        assert rooms_with == {room.id for room in puzzle.rooms}, (
+            f"{difficulty} seed={seed}: bare rooms present")
+
+
+def test_every_suspect_mentioned_in_kept_clues():
+    """ideas.md invariant: every suspect appears in at least one kept clue."""
+    for difficulty, seed in (("easy", 3), ("medium", 1), ("hard", 1)):
+        result = generate(seed, difficulty)
+        mentioned = {c.get("person") for c in result.puzzle.clues} - {None}
+        assert set(result.puzzle.suspect_ids()) <= mentioned, (
+            f"{difficulty} seed={seed}: unconstrained suspects")
+
+
+def test_people_count_equals_board_size():
+    """ideas.md: N = size — one person per row and per column."""
+    for difficulty in ("easy", "medium", "hard", "expert"):
+        result = generate(3, difficulty)
+        size = RANGES[difficulty]["size"]
+        assert len(result.puzzle.people) == size
+        cells = [result.solution[pid] for pid in result.puzzle.people_ids()]
+        assert len({r for r, _ in cells}) == size
+        assert len({c for _, c in cells}) == size
 
 
 def test_solution_satisfies_rules_independently():

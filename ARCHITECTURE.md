@@ -247,7 +247,11 @@ def generate(seed: int, difficulty: str) -> GenerationResult
 
 - Difficulty params per SPEC §6 table; the **rooms range counts rooms including
   voids** (playable rooms = drawn value minus `x`); `x ∈ {0,1}` (void rooms) is
-  chosen first, `R + x` regions grown, then `x` removed.
+  chosen first, `R + x` regions grown, then `x` removed. **People count = board
+  size** (one person per row/column — ideas.md; makes the victim-lock check
+  automatic).
+- Generation invariants (attempt rejected otherwise, ideas.md): every playable
+  room holds ≥ 1 object instance; every suspect appears in ≥ 1 kept clue.
 - One `random.Random(seed)` for the whole pipeline; ≤ 50 attempts per step; on
   exhaustion restart the outer attempt (same RNG), ≤ 40 outer attempts.
 - Objects: pick class first (P(full) = 0.4), then a uniform type within the class
