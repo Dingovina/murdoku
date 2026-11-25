@@ -2,33 +2,48 @@
 
 Single source of direct (non-solver) semantics for server-side
 alternative-solution validation: whether a placement satisfies the SPEC §3
-rules and every clue of a puzzle.  The solver keeps its own fast bitmask
-encoding; the test suites keep their independent evaluators as deliberate
-cross-checks, so a semantics change must touch all three in the same commit
-(the tests pin them against each other).
+rules and every clue of a puzzle.  Consumers: ``server/app.py``
+(alternative-check slow path) and ``clues.enumerate_true_clues`` (clue
+emission reuses the board views).  Semantics changes must touch, and keep
+in agreement: this module, ``solver.py`` (its own fast bitmask encoding),
+and the independent test evaluators (deliberate cross-checks — the tests
+pin all of them against each other).
 
-A placement maps person id -> ``(r, c)`` tuple.  Malformed clue dicts raise
-(ValueError/KeyError); the callers validate puzzles up front
-(``Puzzle.from_dict`` -> ``validate()``) and wrap evaluation in try/except.
+A placement maps person id -> ``(r, c)`` pair; list-valued pairs are
+normalized to tuples at every public entry.  Malformed clue dicts raise
+(ValueError/KeyError); callers validate puzzles up front
+(``Puzzle.from_dict`` -> ``validate()``) and wrap parsing in try/except.
 """
 
-from .model import Puzzle
+from .model import Puzzle, _is_int, d1_holds
+
+Cell = tuple[int, int]
 
 _NEIGHBOR_OFFSETS = ((-1, 0), (1, 0), (0, -1), (0, 1))
 
-_OPS = {
-    "eq": lambda a, k: a == k,
-    "ne": lambda a, k: a != k,
-    "gt": lambda a, k: a > k,
-    "ge": lambda a, k: a >= k,
-    "lt": lambda a, k: a < k,
-    "le": lambda a, k: a <= k,
+# strict row/col comparisons for the directional clue kinds
+_DIRECTIONAL = {
+    "south": lambda a, b: a[0] > b[0],
+    "north": lambda a, b: a[0] < b[0],
+    "east": lambda a, b: a[1] > b[1],
+    "west": lambda a, b: a[1] < b[1],
 }
 
 
-def _is_int(value) -> bool:
-    """True for real ints (bool excluded)."""
-    return isinstance(value, int) and not isinstance(value, bool)
+def _normalized(placement: dict) -> dict:
+    """Copy of the placement with every cell pair converted to a tuple."""
+    return {pid: tuple(cell) for pid, cell in placement.items()}
+
+
+def _suspect_alone_with_victim(puzzle: Puzzle, placement: dict) -> str | None:
+    """The suspect in the victim's room, or None when the victim's room does
+    not hold exactly one suspect (SPEC §3 murder-room rule)."""
+    vroom = puzzle.room_of(placement["victim"])
+    if vroom is None:
+        return None
+    inside = [pid for pid in puzzle.suspect_ids()
+              if puzzle.room_of(placement[pid]) is vroom]
+    return inside[0] if len(inside) == 1 else None
 
 
 class TruthContext:
@@ -45,6 +60,8 @@ class TruthContext:
             if room is not None:
                 room_types.setdefault(room.id, set()).add(obj.type)
         self.room_types = room_types
+        self._people = tuple(puzzle.people_ids())
+        self._suspects = tuple(puzzle.suspect_ids())
         # same-room neighbor cells per cell (same-room «рядом» semantics)
         self._near_cells: dict[Cell, frozenset[Cell]] = {}
         for cell in puzzle.playable_cells():
@@ -56,43 +73,45 @@ class TruthContext:
             }
             self._near_cells[cell] = frozenset(near)
 
+    def near_types(self, cell: Cell) -> set[str | None]:
+        """Object types on same-room neighbor cells (``None`` for empty
+        neighbors) — the emission-side view of the same-room «рядом»."""
+        return {self.type_at.get(nb)
+                for nb in self._near_cells.get(tuple(cell), ())}
+
     # ------------------------------------------------------------------
     # clue truth
     # ------------------------------------------------------------------
 
     def clue_holds(self, clue: dict, placement: dict) -> bool:
         """Direct semantics of one clue dict under ``placement``."""
+        placement = _normalized(placement)
         kind = clue["kind"]
         if kind in ("on", "not_on"):
-            got = self.type_at.get(tuple(placement[clue["person"]])) \
+            got = self.type_at.get(placement[clue["person"]]) \
                 == clue["object_type"]
             return got if kind == "on" else not got
         if kind in ("adjacent", "not_adjacent"):
             got = self._near(placement[clue["person"]], clue["object_type"])
             return got if kind == "adjacent" else not got
         if kind in ("room_has_object", "room_not_has_object"):
-            room = self.puzzle.room_of(tuple(placement[clue["person"]]))
+            room = self.puzzle.room_of(placement[clue["person"]])
             got = room is not None \
                 and clue["object_type"] in self.room_types.get(room.id, ())
             return got if kind == "room_has_object" else not got
-        if kind in ("south", "north", "east", "west"):
-            a = tuple(placement[clue["person"]])
-            b = tuple(placement[clue["person2"]])
-            return {
-                "south": a[0] > b[0], "north": a[0] < b[0],
-                "east": a[1] > b[1], "west": a[1] < b[1],
-            }[kind]
+        if kind in _DIRECTIONAL:
+            return _DIRECTIONAL[kind](placement[clue["person"]],
+                                      placement[clue["person2"]])
         if kind in ("same_room", "not_same_room"):
-            ra = self.puzzle.room_of(tuple(placement[clue["person"]]))
-            rb = self.puzzle.room_of(tuple(placement[clue["person2"]]))
+            ra = self.puzzle.room_of(placement[clue["person"]])
+            rb = self.puzzle.room_of(placement[clue["person2"]])
             same = ra is not None and ra is rb
             return same if kind == "same_room" else not same
         if kind == "room_count":
-            rid, k, op = clue["room"], clue["count"], clue["op"]
-            return _OPS[op](self._room_count(placement, rid), k)
+            return d1_holds(self._room_count(placement, clue["room"]),
+                            clue["op"], clue["count"])
         if kind == "no_empty_rooms":
-            occupied = {self._room_id(placement[pid])
-                        for pid in self.puzzle.people_ids()}
+            occupied = {self._room_id(placement[pid]) for pid in self._people}
             return all(room.id in occupied for room in self.puzzle.rooms)
         raise ValueError(f"unknown clue kind {kind!r}")
 
@@ -110,15 +129,18 @@ class TruthContext:
         or malformed coordinates are "not ok" (False), never an exception.
         """
         puzzle = self.puzzle
-        people = puzzle.people_ids()
+        people = self._people
         if set(placement) != set(people):
             return False
         allowed = puzzle.allowed_cells()
         cells: list[Cell] = []
         for pid in people:
             cell = placement[pid]
-            if not isinstance(cell, tuple) or len(cell) != 2 \
-                    or not _is_int(cell[0]) or not _is_int(cell[1]):
+            if isinstance(cell, list):
+                cell = tuple(cell)
+            elif not isinstance(cell, tuple):
+                return False
+            if len(cell) != 2 or not _is_int(cell[0]) or not _is_int(cell[1]):
                 return False
             if cell not in allowed:
                 return False
@@ -127,10 +149,7 @@ class TruthContext:
                 or len({c for _, c in cells}) != len(cells):
             return False
         # murder room: the victim's room holds exactly one suspect
-        vroom = self.puzzle.room_of(tuple(placement["victim"]))
-        suspects_in = [pid for pid in puzzle.suspect_ids()
-                       if self.puzzle.room_of(tuple(placement[pid])) is vroom]
-        return len(suspects_in) == 1
+        return _suspect_alone_with_victim(puzzle, placement) is not None
 
     # ------------------------------------------------------------------
     # internals
@@ -141,11 +160,10 @@ class TruthContext:
         return room.id if room is not None else None
 
     def _room_count(self, placement: dict, rid: int) -> int:
-        return sum(1 for pid in self.puzzle.people_ids()
+        return sum(1 for pid in self._people
                    if self._room_id(placement[pid]) == rid)
 
     def _near(self, cell, otype: str) -> bool:
-        cell = tuple(cell)
         if self.type_at.get(cell) == otype:
             return False  # standing on O is never «рядом с O» (both bed cells)
         return any(self.type_at.get(nb) == otype
@@ -155,13 +173,7 @@ class TruthContext:
 def unique_killer(puzzle: Puzzle, placement: dict) -> str | None:
     """The suspect alone with the victim per ``placement``, or None when the
     victim's room does not hold exactly one suspect."""
-    room = puzzle.room_of(tuple(placement["victim"])) if "victim" in placement \
-        else None
-    if room is None:
-        return None
-    inside = [pid for pid in puzzle.suspect_ids()
-              if puzzle.room_of(tuple(placement[pid])) is room]
-    return inside[0] if len(inside) == 1 else None
+    return _suspect_alone_with_victim(puzzle, _normalized(placement))
 
 
 def placement_satisfies(puzzle: Puzzle, placement: dict) -> bool:

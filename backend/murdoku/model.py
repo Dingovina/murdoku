@@ -424,6 +424,22 @@ _CLUE_FIELDS: dict[str, frozenset[str]] = {
 _OPS: tuple[str, ...] = ("eq", "ne", "gt", "ge", "lt", "le")
 
 
+def d1_holds(count: int, op: str, k: int) -> bool:
+    """D1 room-count semantics shared by clue emission and the canonical
+    evaluator: ``|people(room)| op k``."""
+    if op == "eq":
+        return count == k
+    if op == "ne":
+        return count != k
+    if op == "gt":
+        return count > k
+    if op == "ge":
+        return count >= k
+    if op == "lt":
+        return count < k
+    return count <= k  # "le"
+
+
 def _is_int(value: object) -> bool:
     """True for real ints (bool excluded)."""
     return isinstance(value, int) and not isinstance(value, bool)

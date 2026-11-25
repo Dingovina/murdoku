@@ -25,6 +25,48 @@
 
 ## Журнал
 
+- **2026-11-26, /simplify по фазе 4 (4 агента: reuse/simplification/efficiency/altitude)** —
+  применённые чистки (поведение не менялось, pytest 273+1skip зелёный):
+  - **Одна копия murder-room правила**: `_suspect_alone_with_victim` в
+    clue_truth, её используют `rules_ok` и `unique_killer`; аппный
+    `_killer_id` делегирован `clue_truth.unique_killer` (было три копии
+    скана); лишний конъюнкт `user_killer is not None` в slow-path убран
+    (rules_ok уже гарантирует).
+  - **Board-view без дублей**: `enumerate_true_clues` теперь строит виды
+    поля (type_at/room_types/near) через `TruthContext` (была 4-я копия
+    семантики в clues.py); `d1_holds` переехала в model.py — общая для
+    emission и clue_truth (заодно снят потенциальный цикл импортов);
+    локальные `_neighbors`/`_d1_holds`/`_OPS`/`_is_int` в clues/clue_truth
+    удалены.
+  - **clue_truth**: нормализация placement на входе публичных методов
+    (12 россыпью tuple() убраны); snapshot people/suspects в __init__
+    (каждый people_ids() больше не копирует список); словарь направлений —
+    модульная таблица компараторов.
+  - **app.py**: `except Exception` сужен до `PuzzleValidationError` вокруг
+    `Puzzle.from_dict` — дефект самого оценщика теперь всплывает как 500
+    (видимый детектор бага), а не тихо деградирует до «misplaced» — именно
+    тот исход, который alt_wins.jsonl должен ловить; мёртвые fallback'и
+    `payload.get("puzzle", {}).get(...)` заменены прямым доступом; guard
+    `isinstance(payload.get("puzzle"), dict)` на call-site убран (callee
+    решает сам); легаси-токены без ключа `puzzle` → fallback (поймано
+    тестами сразу после сужения except — KeyError, исправлено).
+  - **generator.py**: проверка «в каждой комнате ≥ 1 предмет» перенесена
+    в 50-ретрайный цикл `_make_objects` (раньше сгорал весь внешний
+    attempt); фикс бага инварианта «подозреваемый упомянут»: учитывается
+    и `person2` (suspect, стоящий вторым в подсказке направления, теперь
+    засчитывается); у проверки оставлен комментарий про измеренную
+    приемлемость отбраковки.
+  - **Тесты**: `_placements_of` ≡ существующий `_placements` (удалена);
+    рукопашные сборки payload токена (4 копии) сведены на расширенный
+    `_token_for(..., difficulty=, seed=, puzzle=)`; повторный
+    `generate(2, "easy")` в одном тесте убран (сценарий возвращает result);
+    `_tuples()` хелпер в test_clue_truth.
+  - **Skip (с обоснованием)**: удаление дегенеративного ключа `people` из
+    DIFFICULTY_PARAMS (altitude) — сдвиг RNG-потоков перевернул бы все
+    seed→пазл отображения и замеры мёртвых seed ради косметики; полная
+    табличная схема clue_holds — if-цепь из 6 ветвей читаема, таблица
+    добавила бы косвенности; lru_cache на TruthContext — частота не
+    оправдывает.
 - **2026-11-26, фаза 4б — валидация альтернативных решений + лог багов** —
   идея «проверить ответ пользователя по всем подсказкам» из ideas.md:
   - **Токен несёт доску целиком**: payload токена += `seed` и полный

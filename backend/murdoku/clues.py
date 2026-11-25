@@ -36,7 +36,8 @@ from collections.abc import Mapping
 from random import Random
 
 from . import solver
-from .model import Puzzle
+from .clue_truth import TruthContext
+from .model import Puzzle, d1_holds
 
 Cell = tuple[int, int]
 
@@ -88,52 +89,14 @@ def _sort_key(clue: dict) -> tuple:
     )
 
 
-def _neighbors(cell: Cell, height: int, width: int) -> list[Cell]:
-    r, c = cell
-    out = []
-    if r > 0:
-        out.append((r - 1, c))
-    if r < height - 1:
-        out.append((r + 1, c))
-    if c > 0:
-        out.append((r, c - 1))
-    if c < width - 1:
-        out.append((r, c + 1))
-    return out
-
-
-def _d1_holds(count: int, op: str, k: int) -> bool:
-    """True if |people(room)| ``op`` ``k`` holds for the given count."""
-    if op == "eq":
-        return count == k
-    if op == "ne":
-        return count != k
-    if op == "gt":
-        return count > k
-    if op == "ge":
-        return count >= k
-    if op == "lt":
-        return count < k
-    return count <= k  # "le"
-
-
 def enumerate_true_clues(puzzle: Puzzle,
                          solution: Mapping[str, Cell]) -> list[dict]:
     """All TRUE clues from the SPEC §6 step-5 domains, deterministically
     ordered.  ``solution`` must be a full placement (person id -> cell)
     satisfying the SPEC §3 rules for ``puzzle``."""
-    height, width = puzzle.height, puzzle.width
-
-    # static views over the field
-    type_at: dict[Cell, str] = {}
-    room_types: dict[int, set[str]] = {}
-    for obj in puzzle.objects:
-        rid = puzzle.room_of(next(iter(obj.cells)))
-        rid_id = rid.id if rid is not None else 0
-        for cell in obj.cells:
-            type_at[cell] = obj.type
-        room_types.setdefault(rid_id, set()).add(obj.type)
-
+    # board views (types, room types, same-room neighborhoods) come from the
+    # canonical evaluator — one construction shared with /api/check
+    ctx = TruthContext(puzzle)
     suspects = puzzle.suspect_ids()
     types_present = sorted({obj.type for obj in puzzle.objects})
     clues: list[dict] = []
@@ -143,10 +106,9 @@ def enumerate_true_clues(puzzle: Puzzle,
         cell = solution[pid]
         room = puzzle.room_of(cell)
         rid = room.id if room is not None else 0
-        standing_on = type_at.get(cell)
-        near_set = {type_at.get(nb) for nb in _neighbors(cell, height, width)
-                    if room == puzzle.room_of(nb)}
-        room_has = room_types.get(rid, ())
+        standing_on = ctx.type_at.get(cell)
+        near_set = ctx.near_types(cell)
+        room_has = ctx.room_types.get(rid, ())
         for otype in types_present:
             fields = {"person": pid, "object_type": otype}
             on = standing_on == otype
@@ -195,7 +157,7 @@ def enumerate_true_clues(puzzle: Puzzle,
             clues.extend(
                 {"kind": "room_count", "room": room.id, "count": k, "op": op}
                 for k in range(n_people + 1)
-                if _d1_holds(cnt, op, k))
+                if d1_holds(cnt, op, k))
 
     # D2: global "no empty rooms" if true.
     if puzzle.rooms and all(counts.get(room.id, 0) >= 1

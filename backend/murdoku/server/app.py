@@ -30,7 +30,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .. import clue_truth
-from ..model import Puzzle
+from ..model import Puzzle, PuzzleValidationError
 from . import tokens
 
 DIFFICULTIES = ("easy", "medium", "hard", "expert")
@@ -100,13 +100,12 @@ def _parsed_solution(payload: dict) -> dict[str, list[int]] | None:
 
 def _killer_id(puzzle, solution: dict) -> str:
     """The only suspect in the victim's room (SPEC §3 rule 4)."""
-    victim_room = puzzle.room_of(tuple(solution["victim"]))
-    for pid in puzzle.suspect_ids():
-        if puzzle.room_of(tuple(solution[pid])) == victim_room:
-            return pid
-    raise RuntimeError(
-        "generated solution violates SPEC §3: no suspect in the victim's room"
-    )
+    killer = clue_truth.unique_killer(puzzle, solution)
+    if killer is None:
+        raise RuntimeError(
+            "generated solution violates SPEC §3: no suspect in the victim's room"
+        )
+    return killer
 
 
 async def api_puzzle(request: Request) -> JSONResponse:
@@ -232,11 +231,10 @@ async def api_check(request: Request) -> JSONResponse:
 
     wrong = [pid for pid in _people_order(people_ids)
              if placed[pid] != solution[pid]]
-    if wrong and isinstance(payload.get("puzzle"), dict):
+    if wrong:
         alt = _alternative_check(payload, placed, accusation, solution)
         if alt is not None:
             return alt
-    if wrong:
         return JSONResponse({"won": False, "misplaced_person_id": wrong[0]})
     if accusation == killer_id:
         return JSONResponse({"won": True, "solution": solution})
@@ -252,19 +250,23 @@ def _alternative_check(payload: dict, placed: dict, accusation: str,
     compared to it.  Such a win can only stem from a generator/validation
     bug (generated puzzles are unique), so it is granted AND logged for bug
     hunting.  Returns None to fall through to the legacy exact-match
-    responses when the token carries no puzzle or the arrangement is
-    invalid — every pre-existing outcome stays byte-identical.
+    responses when the token carries no (parsable) puzzle or the arrangement
+    is invalid — every pre-existing outcome stays byte-identical.
     """
+    embedded = payload.get("puzzle")
+    if embedded is None:
+        return None  # legacy token without an embedded puzzle
     try:
-        puzzle = Puzzle.from_dict(payload["puzzle"])
-        placement = {pid: (cell[0], cell[1]) for pid, cell in placed.items()}
-        ctx = clue_truth.TruthContext(puzzle)
-        user_killer = clue_truth.unique_killer(puzzle, placement)
-        if not (ctx.rules_ok(placement) and ctx.all_clues_hold(placement)
-                and user_killer is not None):
-            return None
-    except Exception:
-        # malformed embedded puzzle or clue data -> legacy behavior
+        puzzle = Puzzle.from_dict(embedded)
+    except PuzzleValidationError:
+        return None  # malformed embedded puzzle -> legacy behavior
+    placement = {pid: (cell[0], cell[1]) for pid, cell in placed.items()}
+    # a defect in the evaluator must NOT silently degrade an alternative win
+    # into "misplaced" (that outcome is what alt_wins.jsonl exists to catch),
+    # so evaluation happens outside the try and any raise surfaces as a 500
+    ctx = clue_truth.TruthContext(puzzle)
+    user_killer = clue_truth.unique_killer(puzzle, placement)
+    if not (ctx.rules_ok(placement) and ctx.all_clues_hold(placement)):
         return None
     if accusation != user_killer:
         return JSONResponse({"won": False, "correct_accusation": False})
@@ -281,7 +283,7 @@ def _log_alt_win(payload: dict, placement: dict, accusation: str,
         "game_id": payload.get("game_id"),
         "seed": payload.get("seed"),
         "difficulty": payload.get("difficulty"),
-        "clues": payload.get("puzzle", {}).get("clues", []),
+        "clues": payload["puzzle"]["clues"],
         "user_solution": {pid: [r, c] for pid, (r, c) in placement.items()},
         "server_solution": payload.get("solution"),
         "accusation": accusation,

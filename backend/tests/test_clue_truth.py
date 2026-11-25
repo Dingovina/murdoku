@@ -16,6 +16,11 @@ from murdoku.solver import solutions
 from test_clues import clue_is_true, scenario_puzzle
 
 
+def _tuples(solution: dict) -> dict:
+    """Placement with tuple cells (the clue_truth input convention)."""
+    return {pid: tuple(cell) for pid, cell in solution.items()}
+
+
 def _cross_check_clue_holds(difficulty, seed, placements):
     """clue_holds must agree with the independent evaluator everywhere."""
     result = generate(seed, difficulty)
@@ -40,7 +45,7 @@ def _swapped(solution, pid_a, pid_b):
 
 def test_clue_holds_agrees_with_independent_evaluator():
     result = generate(3, "easy")
-    solution = {pid: tuple(cell) for pid, cell in result.solution.items()}
+    solution = _tuples(result.solution)
     _cross_check_clue_holds("easy", 3, {
         "solution": solution,
         "swapped s1/s2": _swapped(solution, "suspect_1", "suspect_2"),
@@ -50,7 +55,7 @@ def test_clue_holds_agrees_with_independent_evaluator():
 
 def test_clue_holds_agrees_on_hard_puzzle():
     result = generate(1, "hard")
-    solution = {pid: tuple(cell) for pid, cell in result.solution.items()}
+    solution = _tuples(result.solution)
     _cross_check_clue_holds("hard", 1, {
         "solution": solution,
         "swapped s2/s3": _swapped(solution, "suspect_2", "suspect_3"),
@@ -62,7 +67,7 @@ def test_rules_ok_rejects_bad_placements():
     result = generate(3, "easy")
     puzzle = result.puzzle
     ctx = TruthContext(puzzle)
-    good = {pid: tuple(cell) for pid, cell in result.solution.items()}
+    good = _tuples(result.solution)
     assert ctx.rules_ok(good)
 
     # off-field coords: "not ok", never an exception
@@ -86,14 +91,13 @@ def test_rules_ok_rejects_bad_placements():
 def test_unique_killer_and_placement_satisfies():
     result = generate(3, "easy")
     puzzle = result.puzzle
-    solution = {pid: tuple(cell) for pid, cell in result.solution.items()}
+    solution = _tuples(result.solution)
     killer = unique_killer(puzzle, solution)
     assert killer in puzzle.suspect_ids()
     assert placement_satisfies(puzzle, solution)
     # every solver solution satisfies rules and clues
     for sol in solutions(puzzle, 5):
-        sol = {pid: tuple(cell) for pid, cell in sol.items()}
-        assert placement_satisfies(puzzle, sol)
+        assert placement_satisfies(puzzle, _tuples(sol))
 
 
 def test_unique_killer_requires_exactly_one_suspect_with_victim():
@@ -114,6 +118,6 @@ def test_from_dict_roundtrip_matches_evaluation():
     """The token-embedded puzzle dict evaluates identically after from_dict."""
     result = generate(3, "easy")
     restored = Puzzle.from_dict(result.puzzle.to_dict())
-    solution = {pid: tuple(cell) for pid, cell in result.solution.items()}
+    solution = _tuples(result.solution)
     assert placement_satisfies(restored, solution)
     assert unique_killer(restored, solution) == unique_killer(result.puzzle, solution)

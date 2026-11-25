@@ -98,13 +98,20 @@ def stub_generator(monkeypatch, puzzle, solution) -> list[dict]:
     return calls
 
 
-def _token_for(solution: dict, killer_id: str) -> str:
+def _token_for(solution: dict, killer_id: str, *, difficulty: str = "medium",
+               seed: int | None = None, puzzle: Puzzle | None = None) -> str:
+    """Token builder shared by all tests; the embedded-puzzle/seed fields
+    are optional so legacy (exact-match-only) tokens are one call away."""
     payload = {
         "game_id": "0" * 32,
-        "difficulty": "medium",
+        "difficulty": difficulty,
         "solution": {pid: [r, c] for pid, (r, c) in solution.items()},
         "killer_id": killer_id,
     }
+    if seed is not None:
+        payload["seed"] = seed
+    if puzzle is not None:
+        payload["puzzle"] = puzzle.to_dict()
     return tokens.make_token(payload)
 
 
@@ -404,13 +411,11 @@ def test_solution_reveal_token_with_malformed_solution(client):
 
 def _alt_scenario():
     """A real generated puzzle, a kept clue whose removal yields exactly
-    two solutions, the alternative placement, and a hand-built token whose
+    two solutions, the alternative placement, and a token builder whose
     embedded puzzle deliberately lacks that clue (non-unique)."""
     result = generate(2, "easy")
     puzzle, solution = result.puzzle, result.solution
-    killer = next(pid for pid in puzzle.suspect_ids()
-                  if puzzle.room_of(solution[pid])
-                  is puzzle.room_of(solution["victim"]))
+    killer = unique_killer(puzzle, solution)
     weakened = None
     for clue in puzzle.clues:
         rest = tuple(c for c in puzzle.clues if c != clue)
@@ -425,41 +430,30 @@ def _alt_scenario():
     alt = alts[0]
 
     def token_with(puzzle_to_embed):
-        return tokens.make_token({
-            "game_id": "0" * 32,
-            "difficulty": "easy",
-            "seed": 2,
-            "solution": {pid: [r, c] for pid, (r, c) in solution.items()},
-            "killer_id": killer,
-            "puzzle": puzzle_to_embed.to_dict(),
-        })
+        return _token_for(solution, killer, difficulty="easy", seed=2,
+                          puzzle=puzzle_to_embed)
 
-    return solution, killer, alt, weakened, token_with
-
-
-def _placements_of(placement: dict) -> list[dict]:
-    return [{"person_id": pid, "r": r, "c": c}
-            for pid, (r, c) in placement.items()]
+    return result, killer, alt, weakened, token_with
 
 
 def test_check_alternative_solution_wins_and_is_logged(client, monkeypatch,
                                                        tmp_path):
     monkeypatch.setenv("MURDOKU_DATA_DIR", str(tmp_path))
-    solution, killer, alt, weakened, token_with = _alt_scenario()
+    result, killer, alt, weakened, token_with = _alt_scenario()
+    solution = {pid: [r, c] for pid, (r, c) in result.solution.items()}
     user_killer = unique_killer(weakened, alt)
     assert user_killer is not None
 
     response = client.post("/api/check", json={
         "token": token_with(weakened),
-        "placements": _placements_of(alt),
+        "placements": _placements(alt),
         "accusation": user_killer,
     })
     assert response.status_code == 200
     body = response.json()
     assert body["won"] is True
     assert body["alternative"] is True
-    assert body["solution"] == {pid: [r, c]
-                                for pid, (r, c) in solution.items()}
+    assert body["solution"] == solution
 
     lines = (tmp_path / "alt_wins.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
@@ -469,8 +463,7 @@ def test_check_alternative_solution_wins_and_is_logged(client, monkeypatch,
     assert record["clues"] == [dict(c) for c in weakened.clues]
     assert record["user_solution"] == {pid: [r, c]
                                        for pid, (r, c) in alt.items()}
-    assert record["server_solution"] == {pid: [r, c]
-                                         for pid, (r, c) in solution.items()}
+    assert record["server_solution"] == solution
     assert record["accusation"] == user_killer
     assert record["inferred_killer"] == user_killer
 
@@ -478,12 +471,12 @@ def test_check_alternative_solution_wins_and_is_logged(client, monkeypatch,
 def test_check_alternative_valid_but_wrong_accusation(client):
     """A valid alternative arrangement with an accusation that is NOT the
     inferred killer of that arrangement is not a win."""
-    solution, killer, alt, weakened, token_with = _alt_scenario()
+    _, _, alt, weakened, token_with = _alt_scenario()
     user_killer = unique_killer(weakened, alt)
     other = next(pid for pid in weakened.suspect_ids() if pid != user_killer)
     response = client.post("/api/check", json={
         "token": token_with(weakened),
-        "placements": _placements_of(alt),
+        "placements": _placements(alt),
         "accusation": other,
     })
     assert response.status_code == 200
@@ -493,15 +486,10 @@ def test_check_alternative_valid_but_wrong_accusation(client):
 def test_check_same_alternative_against_full_set_is_misplaced(client):
     """The alternative violates the dropped clue, so against the FULL kept
     set it is just an invalid arrangement -> legacy misplaced response."""
-    result = generate(2, "easy")
-    puzzle, solution = result.puzzle, result.solution
-    killer = next(pid for pid in puzzle.suspect_ids()
-                  if puzzle.room_of(solution[pid])
-                  is puzzle.room_of(solution["victim"]))
-    _, _, alt, _, token_with = _alt_scenario()
+    result, killer, alt, _, token_with = _alt_scenario()
     response = client.post("/api/check", json={
-        "token": token_with(puzzle),
-        "placements": _placements_of(alt),
+        "token": token_with(result.puzzle),
+        "placements": _placements(alt),
         "accusation": killer,
     })
     assert response.status_code == 200
@@ -513,17 +501,11 @@ def test_check_same_alternative_against_full_set_is_misplaced(client):
 def test_check_token_without_puzzle_keeps_legacy_behavior(client):
     """Old tokens (no embedded puzzle) fall back to exact-match only: the
     alternative arrangement is a plain misplaced response."""
-    solution, killer, alt, _, token_with = _alt_scenario()
-    legacy = tokens.make_token({
-        "game_id": "0" * 32,
-        "difficulty": "easy",
-        "seed": 2,
-        "solution": {pid: [r, c] for pid, (r, c) in solution.items()},
-        "killer_id": killer,
-    })
+    result, killer, alt, _, _ = _alt_scenario()
+    legacy = _token_for(result.solution, killer, difficulty="easy", seed=2)
     response = client.post("/api/check", json={
         "token": legacy,
-        "placements": _placements_of(alt),
+        "placements": _placements(alt),
         "accusation": "suspect_1",
     })
     assert response.status_code == 200

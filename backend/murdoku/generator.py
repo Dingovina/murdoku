@@ -142,14 +142,9 @@ def _attempt(rng: Random, params: dict):
             room_index[cell] = room
     playable = frozenset(room_index)
 
-    objects = _make_objects(rng, room_index, playable, n_objects, n_people)
+    objects = _make_objects(rng, room_index, playable, n_objects, n_people,
+                            {room.id for room in rooms})
     if objects is None:
-        return None
-    # every playable room holds at least one object instance (ideas.md):
-    # a bare room would be undescriptive and clue-starved
-    rooms_with_objects = {room_index[cell].id
-                          for obj in objects for cell in obj.cells}
-    if rooms_with_objects != {room.id for room in rooms}:
         return None
     allowed = _allowed_cells(room_index, objects)
 
@@ -169,8 +164,13 @@ def _attempt(rng: Random, params: dict):
         return None
     kept = prune_clues(full_puzzle, full, rng)
     # every suspect must appear in at least one kept clue (ideas.md): a
-    # suspect referenced by nothing is unconstrained trivia for the player
-    mentioned = {clue["person"] for clue in kept if "person" in clue}
+    # suspect referenced by nothing is unconstrained trivia for the player.
+    # A miss rejects the whole (already unique) attempt — repairing by
+    # re-adding a dropped clue would be possible, but the measured rejection
+    # rate was accepted (PROGRESS 2026-11-26, фаза 4а).  Direction clues
+    # count via person2 as well.
+    mentioned = {clue[key] for clue in kept for key in ("person", "person2")
+                 if key in clue}
     if not set(skeleton.suspect_ids()) <= mentioned:
         return None
     final = Puzzle(size, size, rooms, objects, people, tuple(kept))
@@ -288,7 +288,7 @@ def _free_neighbors(owner: list[int], size: int, idx: int) -> list[int]:
 # ----------------------------------------------------------------------
 
 def _make_objects(rng: Random, room_index: dict, playable: frozenset,
-                  n_objects: int, n_people: int):
+                  n_objects: int, n_people: int, room_ids: set[int]):
     """Place object instances; None after 50 failed tries."""
     size = max(r for r, _ in playable) + 1
     for _ in range(STEP_ATTEMPTS):
@@ -303,6 +303,13 @@ def _make_objects(rng: Random, room_index: dict, playable: frozenset,
         rows = {r for r, _ in allowed}
         cols = {c for _, c in allowed}
         if len(rows) < size or len(cols) < size:
+            continue
+        # ideas.md invariant: no bare rooms — every playable room holds at
+        # least one object instance (cheap in-step retry instead of
+        # discarding the whole outer attempt)
+        rooms_with = {room_index[cell].id
+                      for obj in objects for cell in obj.cells}
+        if rooms_with != room_ids:
             continue
         return objects
     return None
