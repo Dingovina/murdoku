@@ -94,9 +94,8 @@ async def api_puzzle(request: Request) -> JSONResponse:
             f"expected one of: {', '.join(DIFFICULTIES)}"
         )
     raw_seed = request.query_params.get("seed")
-    if raw_seed is None:
-        seed = secrets.randbelow(2**32)
-    else:
+    seeded = raw_seed is not None
+    if seeded:
         try:
             seed = int(raw_seed)
         except ValueError:
@@ -107,12 +106,11 @@ async def api_puzzle(request: Request) -> JSONResponse:
         generate,
     )
 
-    seeded = raw_seed is not None
     result = None
     if seeded:
         # Explicit seed: a deterministic contract (SPEC §6/§7) — exactly one
         # attempt, never re-seeded.  A seed can legitimately exhaust the
-        # generator's <= 20 outer attempts (SPEC §6); the client did nothing
+        # generator's outer attempts (SPEC §6); the client did nothing
         # wrong, so answer 503 (retryable server-side failure) with the same
         # JSON error shape as the 400 paths instead of a bare 500.
         try:

@@ -48,6 +48,7 @@ def main():
                 result = generate(base_seed + i, difficulty)
             except GenerationError:
                 dead += 1  # deterministic seed exhausted its attempts
+                started = time.perf_counter()  # don't bill it to the next one
                 continue
             times.append((time.perf_counter() - started) * 1000.0)
             started = time.perf_counter()

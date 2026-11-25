@@ -90,7 +90,6 @@ body {
 }
 
 .obj--multi {
-  /* position: absolute; — убрать */
   display: flex;
   align-items: center;
   justify-content: center;

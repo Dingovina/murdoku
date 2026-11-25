@@ -226,7 +226,8 @@ def prune_clues(puzzle: Puzzle, clues: list[dict], rng: random.Random) -> list[d
     # two-pass greedy thinning (one rng stream): pass 1 shuffles and probes only the
     # directional C1 clues, pass 2 the rest; drop a clue if count_solutions(puzzle
     # without it, limit=2) == 1; returns the locally-minimal set; caller asserts final
-    # count == 1. Directionals redundant in the full set never survive (SPEC §6 step 5).
+    # count == 1. Directionals are probed first, so kept sets rarely contain any
+    # (SPEC §6 step 5).
 
 # generator.py
 @dataclass

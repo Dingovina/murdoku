@@ -22,9 +22,11 @@ final tie-breaker for C1 pairs).
 shuffle the directional C1 clues into a first pass and every other clue into
 a second, then walk both passes, dropping a clue whenever
 ``count_solutions(puzzle without it, limit=2)`` stays 1.  Directional clues
-are probed FIRST so that every C1 clue redundant with the full set is
-dropped before any other kind is touched — kept sets then contain few or no
-south/north/east/west clues while uniqueness still holds.  The surviving set
+are probed FIRST, so C1 clues that are individually redundant get dropped
+before any other kind is touched — kept sets in practice contain few or no
+south/north/east/west clues while uniqueness still holds.  (A directional
+made necessary by the removal of another directional can survive — pairwise
+redundancy — but that is rare.)  The surviving set
 is locally minimal (a clue found necessary stays necessary, because dropping
 clues only ever grows the solution set); the caller asserts its solution
 count is exactly 1.
@@ -211,8 +213,8 @@ def prune_clues(puzzle: Puzzle, clues: list[dict],
     Pass 1 shuffles (with ``rng``) only the C1 directional clues and probes
     each; pass 2 does the same for every other kind.  A clue is dropped when
     its removal keeps ``count_solutions(...) == 1``.  Returns the locally
-    minimal surviving list (order: shuffled); the caller asserts that its
-    solution count is exactly 1.
+    minimal surviving list (order: as passed in, minus the dropped clues);
+    the caller asserts that its solution count is exactly 1.
 
     Determinism: one RNG stream, fixed pass order — same seed, same kept set.
 

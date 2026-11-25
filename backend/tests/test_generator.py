@@ -16,6 +16,7 @@ from murdoku.clues import KIND_ORDER, enumerate_true_clues
 from murdoku.generator import (
     DIFFICULTIES,
     DIFFICULTY_PARAMS,
+    OUTER_ATTEMPTS,
     GenerationResult,
     generate,
 )
@@ -262,12 +263,12 @@ def test_generation_result_meta():
 
 
 def test_meta_attempts_reflects_outer_retries():
-    """Attempts must be a plausible 1..20 and consistent with determinism:
-    generating the same seed again yields the same attempt count."""
+    """Attempts must be plausible (1..OUTER_ATTEMPTS) and consistent with
+    determinism: generating the same seed again yields the same count."""
     a = generate(7, "medium").meta
     b = generate(7, "medium").meta
     assert a["attempts"] == b["attempts"]
-    assert 1 <= a["attempts"] <= 20
+    assert 1 <= a["attempts"] <= OUTER_ATTEMPTS
 
 
 # ----------------------------------------------------------------------
