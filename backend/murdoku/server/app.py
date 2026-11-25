@@ -138,10 +138,12 @@ async def api_puzzle(request: Request) -> JSONResponse:
             return _generation_failed(difficulty, seed=seed)
     else:
         # No explicit seed: silently retry with fresh random seeds; only a
-        # full streak of failures becomes a 503.
+        # full streak of failures becomes a 503.  The drawn seed travels in
+        # the token (needed for alternative-win logging).
         for _ in range(GENERATION_RETRIES):
+            seed = secrets.randbelow(2**32)
             try:
-                result = generate(secrets.randbelow(2**32), difficulty)
+                result = generate(seed, difficulty)
                 break
             except GenerationError:
                 continue
@@ -150,8 +152,12 @@ async def api_puzzle(request: Request) -> JSONResponse:
     payload = {
         "game_id": uuid.uuid4().hex,
         "difficulty": difficulty,
+        "seed": seed,
         "solution": {pid: [r, c] for pid, (r, c) in result.solution.items()},
         "killer_id": _killer_id(result.puzzle, result.solution),
+        # The full puzzle rides in the token so the stateless /api/check can
+        # validate ALTERNATIVE (non-identical) solutions against the clues.
+        "puzzle": result.puzzle.to_dict(),
     }
     token = tokens.make_token(payload)
     return JSONResponse({"puzzle": result.puzzle.to_dict(), "token": token})
