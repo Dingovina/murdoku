@@ -27,6 +27,20 @@ python3 -m venv .venv
 .venv/bin/pip install -e 'backend[dev]'
 ```
 
+**Windows (cmd или PowerShell):**
+
+```bat
+py -3 -m venv .venv
+.venv\Scripts\pip install -e backend[dev]
+```
+
+**Windows (Git Bash):**
+
+```sh
+py -3 -m venv .venv
+.venv/Scripts/pip install -e 'backend[dev]'
+```
+
 **Примечание для Ubuntu:** в системном Python без `ensurepip` создание venv
 падает. Один из двух вариантов:
 
@@ -43,6 +57,26 @@ python3 -m venv --without-pip .venv
 
 ```sh
 MURDOKU_SECRET=какой-нибудь-секрет .venv/bin/python -m murdoku.server
+```
+
+**Windows (cmd):**
+
+```bat
+set MURDOKU_SECRET=какой-нибудь-секрет
+.venv\Scripts\python.exe -m murdoku.server
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:MURDOKU_SECRET = "какой-нибудь-секрет"
+.venv\Scripts\python.exe -m murdoku.server
+```
+
+**Windows (Git Bash):**
+
+```sh
+MURDOKU_SECRET=какой-нибудь-секрет .venv/Scripts/python.exe -m murdoku.server
 ```
 
 - `MURDOKU_SECRET` — обязателен (ключ токенов). Если не задан: при
@@ -64,12 +98,24 @@ cd backend && ../.venv/bin/python -m pytest -q   # бэкенд (включая 
 cd frontend && node --test                       # фронтенд (чистая логика)
 ```
 
+**Windows:** в cmd/PowerShell — `..\.venv\Scripts\python.exe -m pytest -q`
+из `backend\`; в Git Bash те же команды, что и выше
+(`../.venv/Scripts/python.exe`):
+
+```sh
+cd backend && ../.venv/Scripts/python.exe -m pytest -q
+cd frontend && node --test
+```
+
 ### Бенчмарки
 
 ```sh
 .venv/bin/python backend/scripts/bench_solver.py     # count_solutions на 9x9/N=9 (бюджет < 100 мс)
 .venv/bin/python backend/scripts/bench_generator.py  # время генерации по сложностям (expert < 3 с в среднем)
 ```
+
+**Windows (Git Bash / cmd):** тот же путь через `.venv/Scripts/python.exe`
+(в cmd — `.venv\Scripts\python.exe backend\scripts\bench_solver.py`).
 
 ## Структура репозитория
 
