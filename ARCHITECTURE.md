@@ -201,8 +201,9 @@ def count_solutions(puzzle: Puzzle, limit: int = 2) -> int
 - Enforces ALL of SPEC §3 (one cell per person, distinct rows, distinct cols, no full
   objects, murder room) plus every clue. Semantics notes:
   - «рядом с O» — person's cell has an orth-adjacent cell containing an instance of O
-    AND the person's own cell does not contain an instance of O (applies to both bed
-    cells). `adj` is orth-only, a cell is not adjacent to itself.
+    AND that instance cell lies in the same room as the person's cell (same-room
+    semantics, SPEC §4) AND the person's own cell does not contain an instance of O
+    (applies to both bed cells). `adj` is orth-only, a cell is not adjacent to itself.
   - D-counters count **all** people incl. the victim.
   - Murder room = victim's room: exactly one suspect there (all other suspects outside).
 - Algorithm: backtracking with MRV; **place the victim first** (murder-room pruning
@@ -222,8 +223,10 @@ def enumerate_true_clues(puzzle: Puzzle, solution: Mapping[str, Cell]) -> list[d
     # A/B per suspect × type present on the field; C1 ordered pairs, C2/C3 unordered;
     # D1 room × op × k ∈ 0..N (true combos only); D2 global if true.
 def prune_clues(puzzle: Puzzle, clues: list[dict], rng: random.Random) -> list[dict]
-    # shuffle with rng; drop a clue if count_solutions(puzzle without it, limit=2) == 1;
-    # returns the locally-minimal set; caller asserts final count == 1.
+    # two-pass greedy thinning (one rng stream): pass 1 shuffles and probes only the
+    # directional C1 clues, pass 2 the rest; drop a clue if count_solutions(puzzle
+    # without it, limit=2) == 1; returns the locally-minimal set; caller asserts final
+    # count == 1. Directionals redundant in the full set never survive (SPEC §6 step 5).
 
 # generator.py
 @dataclass
@@ -235,10 +238,11 @@ class GenerationResult:
 def generate(seed: int, difficulty: str) -> GenerationResult
 ```
 
-- Difficulty params per SPEC §6 table; **room counts = playable rooms after voids**;
-  `x ∈ {0,1,2}` (void rooms) is chosen first, `R + x` regions grown, then `x` removed.
+- Difficulty params per SPEC §6 table; the **rooms range counts rooms including
+  voids** (playable rooms = drawn value minus `x`); `x ∈ {0,1}` (void rooms) is
+  chosen first, `R + x` regions grown, then `x` removed.
 - One `random.Random(seed)` for the whole pipeline; ≤ 50 attempts per step; on
-  exhaustion restart the outer attempt (same RNG), ≤ 20 outer attempts.
+  exhaustion restart the outer attempt (same RNG), ≤ 40 outer attempts.
 - Objects: pick class first (P(full) = 0.4), then a uniform type within the class
   (bed only reachable via the partial branch); distinct cells; bed = random cell +
   random orth neighbor in the same room.
@@ -250,6 +254,11 @@ def generate(seed: int, difficulty: str) -> GenerationResult
 - `GET /api/puzzle?difficulty={easy|medium|hard|expert}[&seed=N]` →
   `200 {"puzzle": {...}, "token": "..."}`; default difficulty `medium`;
   unknown difficulty or bad seed → `400 {"error": "..."}`.
+  Generation failure (`GenerationError`) → `503 {"error": "..."}` (same JSON shape,
+  SPEC §7): a request WITHOUT `seed` silently re-seeds with fresh random seeds up to
+  `GENERATION_RETRIES = 5` attempts before answering 503; a request WITH an explicit
+  seed makes exactly one attempt (the seed is never replaced — same seed ⇒ same
+  puzzle bytes).
 - `POST /api/check` body `{"token", "placements": [{"person_id","r","c"}...], "accusation"}`:
   - `400 {"error"}` on: bad JSON / missing fields / invalid token / placements not
     covering exactly all people ids exactly once / non-int coords / accusation not a

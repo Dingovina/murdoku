@@ -11,7 +11,8 @@ Backtracking with MRV over per-person candidate-cell bitmasks:
   ``on`` / ``not_on`` / ``adjacent`` / ``not_adjacent`` / room-has-object all
   depend only on the person's own cell, because object positions are static
   (for «рядом с O» the person's own cell must NOT contain an instance of O,
-  which also covers standing on either cell of a bed);
+  which also covers standing on either cell of a bed; adjacency counts only
+  within the person's own room — SPEC §4 same-room semantics);
 - C clues (south/north/east/west, same/different room) are applied three
   ways: statically (bounds consistency over the per-person masks before the
   search), at assignment events against already-assigned people, and as
@@ -173,24 +174,30 @@ class Geometry:
         return masks
 
     def _compute_type_masks(self, otype: str) -> tuple[int, int, int]:
-        """Bitmasks over cells: (has O, near O, room contains O)."""
+        """Bitmasks over cells: (has O, near O, room contains O).
+
+        «near O» is same-room adjacency (SPEC §4): the neighbouring cell
+        must hold O *and* lie in the same room as the cell itself.
+        """
         w, h = self.w, self.h
         has = 0
         for obj in self.objects:
             if obj.type == otype:
                 for (r, c) in obj.cells:
                     has |= 1 << (r * w + c)
+        room_id_of = self.room_id_of
         near = 0
         for idx in range(w * h):
             bit = 1 << idx
             if has & bit:
                 continue
+            rid = room_id_of[idx]
             r, c = divmod(idx, w)
             hit = (
-                (r > 0 and has & (bit >> w))
-                or (r < h - 1 and has & (bit << w))
-                or (c > 0 and has & (bit >> 1))
-                or (c < w - 1 and has & (bit << 1))
+                (r > 0 and room_id_of[idx - w] == rid and has & (bit >> w))
+                or (r < h - 1 and room_id_of[idx + w] == rid and has & (bit << w))
+                or (c > 0 and room_id_of[idx - 1] == rid and has & (bit >> 1))
+                or (c < w - 1 and room_id_of[idx + 1] == rid and has & (bit << 1))
             )
             if hit:
                 near |= bit

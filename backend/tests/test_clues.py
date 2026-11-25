@@ -14,6 +14,8 @@ from murdoku.clues import (
     enumerate_true_clues,
     prune_clues,
 )
+
+_DIRECTIONAL = ("south", "north", "east", "west")
 from murdoku.model import ObjectInstance, Person, Puzzle, Room
 from murdoku.solver import count_solutions
 
@@ -70,12 +72,18 @@ def type_at(puzzle, cell):
 
 
 def near(puzzle, cell, otype):
-    """«рядом с O»: an orth neighbour holds O and the cell itself not."""
+    """«рядом с O»: an orth neighbour holds O and the cell itself not.
+
+    Same-room semantics (SPEC §4): the neighbour must lie in the same room
+    as ``cell``; adjacency across a room boundary does not count.
+    """
     if type_at(puzzle, cell) == otype:
         return False
     r, c = cell
     for nb in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)):
         if 0 <= nb[0] < puzzle.height and 0 <= nb[1] < puzzle.width \
+                and puzzle.room_of(nb) is not None \
+                and puzzle.room_of(nb) is puzzle.room_of(cell) \
                 and type_at(puzzle, nb) == otype:
             return True
     return False
@@ -116,6 +124,33 @@ def clue_is_true(puzzle, solution, clue):
                     for pid in puzzle.people_ids()}
         return all(room.id in occupied for room in puzzle.rooms)
     raise AssertionError(f"unknown clue kind {kind!r}")
+
+
+def test_near_is_same_room_only():
+    """«рядом с O» ignores instances across a room boundary (SPEC §4)."""
+    puzzle = scenario_puzzle()
+    # (1,2) sits in room 2; its neighbour (1,1) holds the armchair but
+    # belongs to room 1 — across the wall, so NOT «рядом».
+    assert not near(puzzle, (1, 2), "armchair")
+    # (0,1) is room 1 like the armchair at (1,1) — «рядом» holds.
+    assert near(puzzle, (0, 1), "armchair")
+    placement = {"suspect_1": (1, 2), "suspect_2": (0, 1), "victim": (0, 0)}
+    assert clue_is_true(puzzle, placement, {"kind": "not_adjacent",
+                                            "person": "suspect_1",
+                                            "object_type": "armchair"})
+    assert not clue_is_true(puzzle, placement, {"kind": "adjacent",
+                                                "person": "suspect_1",
+                                                "object_type": "armchair"})
+    # enumeration agrees with the direct evaluator
+    clues = enumerate_true_clues(puzzle, placement)
+    kinds_s1 = [c["kind"] for c in clues
+                if c.get("person") == "suspect_1"
+                and c.get("object_type") == "armchair"]
+    assert "not_adjacent" in kinds_s1 and "adjacent" not in kinds_s1
+    kinds_s2 = [c["kind"] for c in clues
+                if c.get("person") == "suspect_2"
+                and c.get("object_type") == "armchair"]
+    assert "adjacent" in kinds_s2
 
 
 # ----------------------------------------------------------------------
@@ -273,6 +308,29 @@ def test_prune_is_deterministic_per_rng_seed():
         prune_clues(puzzle, full, Random(7))
     assert prune_clues(puzzle, full, Random(8)) != \
         prune_clues(puzzle, full, Random(9))
+
+
+def test_prune_drops_redundant_directionals_first():
+    """Every directional clue redundant in the FULL set is absent from kept,
+    whatever the RNG permutation — pass 1 probes C1 before anything else
+    (kept sets stay lean of south/north/east/west)."""
+    puzzle = scenario_puzzle()
+    full = enumerate_true_clues(puzzle, SCENARIO_SOLUTION)
+    redundant = []
+    for c in full:
+        if c["kind"] not in _DIRECTIONAL:
+            continue
+        rest = tuple(x for x in full if x != c)
+        probe = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people, rest)
+        if count_solutions(probe, 2) == 1:
+            redundant.append(c)
+    for seed in range(10):
+        kept = prune_clues(puzzle, full, Random(seed))
+        for c in redundant:
+            assert c not in kept, f"seed {seed}: redundant directional {c} kept"
+        final = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people,
+                       tuple(kept))
+        assert count_solutions(final, 2) == 1
 
 
 def test_prune_on_minimal_list_is_noop():

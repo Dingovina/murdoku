@@ -29,6 +29,10 @@ const SAMPLE_PUZZLE = {
     // Blocks (2,1): without it suspect_2/victim could also sit at (2,1)/(3,0),
     // giving the sample a second solution.
     { id: 'obj_11', type: 'wardrobe', cells: [{ r: 2, c: 1 }] },
+    // Same-room semantics: (2,0) and (3,1) have identical same-room object
+    // neighbourhoods, so suspect_2/victim could swap there unnoticed. The
+    // carpet under suspect_2 pins suspect_2 to (2,0) via the `on` clue.
+    { id: 'obj_12', type: 'carpet', cells: [{ r: 2, c: 0 }] },
   ],
   people: [
     { id: 'suspect_1', name: 'Подозреваемый_1', portrait_seed: 120483 },
@@ -41,7 +45,10 @@ const SAMPLE_PUZZLE = {
     { kind: 'on', person: 'suspect_4', object_type: 'armchair' },
     { kind: 'on', person: 'suspect_3', object_type: 'sofa' },
     { kind: 'not_on', person: 'suspect_1', object_type: 'carpet' },
-    { kind: 'adjacent', person: 'suspect_2', object_type: 'bed' },
+    // Same-room semantics: suspect_2's cell (2,0) touches the bed cell (1,0)
+    // only across the room 1/room 3 wall, so the clue is a negation.
+    { kind: 'not_adjacent', person: 'suspect_2', object_type: 'bed' },
+    { kind: 'on', person: 'suspect_2', object_type: 'carpet' },
     { kind: 'not_adjacent', person: 'suspect_1', object_type: 'bed' },
     { kind: 'room_has_object', person: 'suspect_1', object_type: 'tv' },
     { kind: 'room_not_has_object', person: 'suspect_2', object_type: 'tv' },

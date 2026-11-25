@@ -3,14 +3,14 @@
 One ``random.Random(seed)`` drives the whole pipeline, so the same seed
 always yields the same puzzle bytes.  Per SPEC: every step gets up to 50
 inner attempts; when a step exhausts them, the whole outer attempt restarts
-(the RNG stream simply continues), up to 20 outer attempts.
+(the RNG stream simply continues), up to 40 outer attempts.
 
 Steps:
 
-1. pick the number of void rooms ``x ∈ {0,1,2}`` and the target number of
-   playable rooms ``R`` from the difficulty range; grow ``R + x`` regions
-   over the whole rectangle (BFS from seeds in random order, every region
-   ≥ 2 cells);
+1. pick the number of void rooms ``x ∈ {0,1}`` and the target number of
+   playable rooms ``R = randint(rooms range) - x`` (the difficulty range
+   counts rooms INCLUDING voids); grow ``R + x`` regions over the whole
+   rectangle (BFS from seeds in random order, every region ≥ 2 cells);
 2. exclude ``x`` random regions as voids (≤ 30% of the rectangle area),
    validate the silhouette (every row and column keeps ≥ 1 playable cell);
 3. place object instances (class first with P(full) = 0.4, then a uniform
@@ -44,10 +44,10 @@ from .solver import count_solutions
 
 Cell = tuple[int, int]
 
-# Difficulty parameters per SPEC §6; room counts = playable rooms AFTER the
-# voids are excluded (x is chosen first, R + x regions are grown, x removed).
+# Difficulty parameters per SPEC §6; the "rooms" range counts rooms INCLUDING
+# the voids — playable rooms = drawn value minus x (SPEC §6 step 1).
 DIFFICULTY_PARAMS: dict[str, dict] = {
-    "easy":   {"size": 6, "people": (4, 5), "objects": (4, 11), "rooms": (4, 6)},
+    "easy":   {"size": 6, "people": (4, 5), "objects": (6, 10), "rooms": (3, 5)},
     "medium": {"size": 7, "people": (5, 7), "objects": (5, 15), "rooms": (5, 10)},
     "hard":   {"size": 8, "people": (6, 8), "objects": (7, 19), "rooms": (6, 13)},
     "expert": {"size": 9, "people": (7, 9), "objects": (8, 24), "rooms": (7, 16)},
@@ -55,7 +55,7 @@ DIFFICULTY_PARAMS: dict[str, dict] = {
 DIFFICULTIES: tuple[str, ...] = tuple(DIFFICULTY_PARAMS)
 
 STEP_ATTEMPTS = 50   # per-step attempt limit (SPEC §6)
-OUTER_ATTEMPTS = 20  # outer attempt limit (SPEC §6)
+OUTER_ATTEMPTS = 40  # outer attempt limit (SPEC §6)
 
 _FULL_TYPE_IDS = tuple(
     t for t in OBJECT_TYPE_IDS if OBJECT_TYPES[t].cls == FULL)
@@ -126,8 +126,8 @@ def _attempt(rng: Random, params: dict):
     seed -> puzzle deterministic.
     """
     size = params["size"]
-    x = rng.randint(0, 2)                     # void rooms (SPEC §6 step 1)
-    n_rooms = rng.randint(*params["rooms"])   # playable rooms target
+    x = rng.randint(0, 1)                     # void rooms (SPEC §6 step 1)
+    n_rooms = rng.randint(*params["rooms"]) - x  # playable rooms target
     n_people = rng.randint(*params["people"])
     n_objects = rng.randint(*params["objects"])
 

@@ -152,10 +152,16 @@ def _on(puzzle, cell, otype):
 
 
 def _near(puzzle, cell, otype):
-    """«рядом с O»: adjacent instance of O and own cell has none of O."""
+    """«рядом с O»: adjacent instance of O and own cell has none of O.
+
+    Same-room semantics (SPEC §4): the neighbour must lie in the same
+    room as ``cell``.
+    """
     if _on(puzzle, cell, otype):
         return False
-    return any(_on(puzzle, nb, otype)
+    return any(puzzle.room_of(nb) is not None
+               and puzzle.room_of(nb) is puzzle.room_of(cell)
+               and _on(puzzle, nb, otype)
                for nb in _neighbors(cell, puzzle.width, puzzle.height))
 
 
@@ -358,6 +364,28 @@ class TestAAdjacent:
         assert count_solutions(scenario1c(
             BASE1C + (clue("adjacent", person="suspect_2",
                            object_type="bed"),))) == 0
+
+    def test_adjacent_is_same_room_only(self):
+        """«рядом» counts only same-room instances (SPEC §4).
+
+        sameroom_scenario: the armchair (1,1) is orth-adjacent to (1,2)
+        (room 2) across the wall; same-room neighbours are only the room-1
+        cells (0,1)/(1,0). An `adjacent` clue must pin suspect_1 to the
+        in-room neighbours, and a cross-room cell like (1,2) must stay
+        available to `not_adjacent`.
+        """
+        adj = sameroom_scenario((clue("adjacent", person="suspect_1",
+                                      object_type="armchair"),))
+        seen = list(solutions(adj, 10 ** 6))
+        assert seen
+        assert all(s["suspect_1"] in ((0, 1), (1, 0)) for s in seen)
+        assert_agrees_with_naive(adj)
+
+        not_adj = sameroom_scenario((clue("not_adjacent", person="suspect_1",
+                                          object_type="armchair"),))
+        seen = list(solutions(not_adj, 10 ** 6))
+        assert any(s["suspect_1"] == (1, 2) for s in seen)
+        assert_agrees_with_naive(not_adj)
 
 
 class TestBRoomHasObject:

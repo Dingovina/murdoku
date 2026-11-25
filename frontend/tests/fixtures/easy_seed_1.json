@@ -16,22 +16,6 @@
         {
           "r": 1,
           "c": 0
-        },
-        {
-          "r": 1,
-          "c": 1
-        },
-        {
-          "r": 2,
-          "c": 0
-        },
-        {
-          "r": 2,
-          "c": 1
-        },
-        {
-          "r": 3,
-          "c": 1
         }
       ]
     },
@@ -40,10 +24,6 @@
       "cells": [
         {
           "r": 0,
-          "c": 2
-        },
-        {
-          "r": 0,
           "c": 3
         },
         {
@@ -56,10 +36,26 @@
         },
         {
           "r": 1,
+          "c": 4
+        },
+        {
+          "r": 1,
           "c": 5
         },
         {
           "r": 2,
+          "c": 3
+        },
+        {
+          "r": 2,
+          "c": 4
+        },
+        {
+          "r": 2,
+          "c": 5
+        },
+        {
+          "r": 3,
           "c": 5
         }
       ]
@@ -68,12 +64,20 @@
       "id": 3,
       "cells": [
         {
-          "r": 1,
-          "c": 2
+          "r": 2,
+          "c": 0
         },
         {
           "r": 2,
-          "c": 2
+          "c": 1
+        },
+        {
+          "r": 3,
+          "c": 0
+        },
+        {
+          "r": 3,
+          "c": 1
         },
         {
           "r": 3,
@@ -85,11 +89,11 @@
         },
         {
           "r": 4,
-          "c": 3
+          "c": 0
         },
         {
           "r": 4,
-          "c": 4
+          "c": 2
         }
       ]
     },
@@ -97,41 +101,8 @@
       "id": 4,
       "cells": [
         {
-          "r": 1,
-          "c": 3
-        },
-        {
-          "r": 1,
-          "c": 4
-        },
-        {
-          "r": 2,
-          "c": 3
-        },
-        {
-          "r": 2,
-          "c": 4
-        },
-        {
           "r": 3,
           "c": 4
-        },
-        {
-          "r": 3,
-          "c": 5
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "cells": [
-        {
-          "r": 3,
-          "c": 0
-        },
-        {
-          "r": 4,
-          "c": 0
         },
         {
           "r": 4,
@@ -139,7 +110,15 @@
         },
         {
           "r": 4,
-          "c": 2
+          "c": 3
+        },
+        {
+          "r": 4,
+          "c": 4
+        },
+        {
+          "r": 4,
+          "c": 5
         },
         {
           "r": 5,
@@ -148,15 +127,6 @@
         {
           "r": 5,
           "c": 1
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "cells": [
-        {
-          "r": 4,
-          "c": 5
         },
         {
           "r": 5,
@@ -180,81 +150,75 @@
   "objects": [
     {
       "id": "obj_1",
-      "type": "armchair",
+      "type": "wardrobe",
       "cells": [
         {
           "r": 2,
-          "c": 3
-        }
-      ]
-    },
-    {
-      "id": "obj_2",
-      "type": "tv",
-      "cells": [
-        {
-          "r": 3,
           "c": 5
         }
       ]
     },
     {
-      "id": "obj_3",
-      "type": "tv",
+      "id": "obj_2",
+      "type": "armchair",
       "cells": [
         {
-          "r": 1,
+          "r": 5,
+          "c": 0
+        }
+      ]
+    },
+    {
+      "id": "obj_3",
+      "type": "armchair",
+      "cells": [
+        {
+          "r": 2,
           "c": 4
         }
       ]
     },
     {
       "id": "obj_4",
-      "type": "tv",
+      "type": "carpet",
       "cells": [
         {
-          "r": 3,
-          "c": 1
+          "r": 4,
+          "c": 2
         }
       ]
     },
     {
       "id": "obj_5",
-      "type": "armchair",
+      "type": "tv",
       "cells": [
         {
-          "r": 5,
-          "c": 3
+          "r": 0,
+          "c": 4
         }
       ]
     },
     {
       "id": "obj_6",
-      "type": "sofa",
+      "type": "carpet",
       "cells": [
         {
-          "r": 2,
-          "c": 5
+          "r": 0,
+          "c": 0
         }
       ]
     },
     {
       "id": "obj_7",
-      "type": "wardrobe",
+      "type": "bed",
       "cells": [
         {
           "r": 2,
-          "c": 1
-        }
-      ]
-    },
-    {
-      "id": "obj_8",
-      "type": "tv",
-      "cells": [
+          "c": 0
+        },
         {
-          "r": 1,
-          "c": 2
+          "r": 2,
+          "c": 1
         }
       ]
     }
@@ -263,67 +227,60 @@
     {
       "id": "suspect_1",
       "name": "Подозреваемый_1",
-      "portrait_seed": 1623363792
+      "portrait_seed": 2590965539
     },
     {
       "id": "suspect_2",
       "name": "Подозреваемый_2",
-      "portrait_seed": 860743485
+      "portrait_seed": 3084118544
     },
     {
       "id": "suspect_3",
       "name": "Подозреваемый_3",
-      "portrait_seed": 1490056820
+      "portrait_seed": 926247152
+    },
+    {
+      "id": "suspect_4",
+      "name": "Подозреваемый_4",
+      "portrait_seed": 2134077898
     },
     {
       "id": "victim",
       "name": "Убитый",
-      "portrait_seed": 425310703
+      "portrait_seed": 4054661088
     }
   ],
   "clues": [
     {
-      "kind": "adjacent",
-      "person": "suspect_3",
-      "object_type": "sofa"
+      "kind": "on",
+      "person": "suspect_4",
+      "object_type": "armchair"
     },
     {
-      "kind": "not_adjacent",
+      "kind": "adjacent",
       "person": "suspect_1",
       "object_type": "armchair"
     },
     {
-      "kind": "not_adjacent",
-      "person": "suspect_1",
-      "object_type": "tv"
+      "kind": "adjacent",
+      "person": "suspect_2",
+      "object_type": "carpet"
     },
     {
-      "kind": "not_adjacent",
-      "person": "suspect_2",
+      "kind": "adjacent",
+      "person": "suspect_3",
       "object_type": "wardrobe"
     },
     {
       "kind": "room_has_object",
-      "person": "suspect_2",
+      "person": "suspect_4",
       "object_type": "wardrobe"
     },
     {
       "kind": "room_count",
-      "room": 1,
-      "count": 1,
-      "op": "ne"
-    },
-    {
-      "kind": "room_count",
-      "room": 5,
-      "count": 1,
-      "op": "lt"
-    },
-    {
-      "kind": "room_count",
-      "room": 6,
+      "room": 3,
       "count": 0,
-      "op": "eq"
+      "op": "le"
     }
   ]
 }

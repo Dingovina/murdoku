@@ -29,6 +29,9 @@ from starlette.staticfiles import StaticFiles
 from . import tokens
 
 DIFFICULTIES = ("easy", "medium", "hard", "expert")
+# Generation attempts for UNSEEDED /api/puzzle requests only; explicit seeds
+# are deterministic (SPEC §6/§7) and get exactly one attempt.
+GENERATION_RETRIES = 5
 
 # backend/murdoku/server/app.py -> parents[3] == repo root (ARCHITECTURE §8).
 FRONTEND_DIR = Path(__file__).resolve().parents[3] / "frontend"
@@ -41,6 +44,18 @@ if not FRONTEND_DIR.is_dir():
 
 def _error(message: str) -> JSONResponse:
     return JSONResponse({"error": message}, status_code=400)
+
+
+def _generation_failed(difficulty: str, seed: int | None) -> JSONResponse:
+    """503 with the same JSON error shape as the 400 paths (SPEC §7)."""
+    suffix = f" with seed {seed}" if seed is not None else ""
+    return JSONResponse(
+        {
+            "error": f"puzzle generation failed for difficulty "
+            f"{difficulty!r}{suffix}; try another seed"
+        },
+        status_code=503,
+    )
 
 
 def _is_int(value: object) -> bool:
@@ -92,20 +107,29 @@ async def api_puzzle(request: Request) -> JSONResponse:
         generate,
     )
 
-    try:
-        result = generate(seed, difficulty)
-    except GenerationError:
-        # A deterministic seed can legitimately exhaust the generator's
-        # <= 20 outer attempts (SPEC §6); the client did nothing wrong, so
-        # answer 503 (retryable server-side failure) with the same JSON
-        # error shape as the 400 paths instead of a bare 500.
-        return JSONResponse(
-            {
-                "error": f"puzzle generation failed for difficulty "
-                f"{difficulty!r} with seed {seed}; try another seed"
-            },
-            status_code=503,
-        )
+    seeded = raw_seed is not None
+    result = None
+    if seeded:
+        # Explicit seed: a deterministic contract (SPEC §6/§7) — exactly one
+        # attempt, never re-seeded.  A seed can legitimately exhaust the
+        # generator's <= 20 outer attempts (SPEC §6); the client did nothing
+        # wrong, so answer 503 (retryable server-side failure) with the same
+        # JSON error shape as the 400 paths instead of a bare 500.
+        try:
+            result = generate(seed, difficulty)
+        except GenerationError:
+            return _generation_failed(difficulty, seed=seed)
+    else:
+        # No explicit seed: silently retry with fresh random seeds; only a
+        # full streak of failures becomes a 503.
+        for _ in range(GENERATION_RETRIES):
+            try:
+                result = generate(secrets.randbelow(2**32), difficulty)
+                break
+            except GenerationError:
+                continue
+        if result is None:
+            return _generation_failed(difficulty, seed=None)
     payload = {
         "game_id": uuid.uuid4().hex,
         "difficulty": difficulty,

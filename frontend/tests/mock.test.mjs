@@ -41,8 +41,11 @@ function clueIsTrue(clue, placement) {
   const cellOf = (id) => placement.get(id);
   const roomOfPerson = (id) => roomOfCell.get(cellOf(id).join(','));
   const objHere = (id) => objAt.get(cellOf(id).join(','));
-  const nearObj = (id, t) => (objCells.get(t) || []).some((x) => adjacent(x, cellOf(id)))
-    && objHere(id) !== t;
+  // Same-room «рядом» (SPEC §4): the instance must be adjacent AND in the
+  // person's own room.
+  const nearObj = (id, t) => (objCells.get(t) || []).some(
+    (x) => adjacent(x, cellOf(id)) && roomOfCell.get(x.join(',')) === roomOfPerson(id),
+  ) && objHere(id) !== t;
   const counts = {};
   for (const [id, cell] of placement) {
     const r = roomOfCell.get(cell.join(','));
@@ -80,8 +83,9 @@ function personalCells(personId) {
       if (clue.kind === 'on' && !(objAt.get(k) === clue.object_type)) { ok = false; break; }
       if (clue.kind === 'not_on' && !(objAt.get(k) !== clue.object_type)) { ok = false; break; }
       if (clue.kind === 'adjacent' || clue.kind === 'not_adjacent') {
-        const near = (objCells.get(clue.object_type) || []).some((x) => adjacent(x, cell))
-          && objAt.get(k) !== clue.object_type;
+        const near = (objCells.get(clue.object_type) || []).some(
+          (x) => adjacent(x, cell) && roomOfCell.get(x.join(',')) === room,
+        ) && objAt.get(k) !== clue.object_type;
         if ((clue.kind === 'adjacent') !== near) { ok = false; break; }
       }
       if (clue.kind === 'room_has_object' && !roomsWith(clue.object_type).has(room)) { ok = false; break; }

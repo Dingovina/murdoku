@@ -18,10 +18,16 @@ The result is sorted by a deterministic key: kind order as in SPEC §4,
 person number, object type id, room id, count, op index (plus person2 as a
 final tie-breaker for C1 pairs).
 
-``prune_clues`` implements the SPEC greedy thinning: shuffle the true clue
-list with the caller's RNG, then walk it, dropping a clue whenever
-``count_solutions(puzzle without it, limit=2)`` stays 1.  The surviving set
-is locally minimal; the caller asserts its solution count is exactly 1.
+``prune_clues`` implements the SPEC greedy thinning: with the caller's RNG,
+shuffle the directional C1 clues into a first pass and every other clue into
+a second, then walk both passes, dropping a clue whenever
+``count_solutions(puzzle without it, limit=2)`` stays 1.  Directional clues
+are probed FIRST so that every C1 clue redundant with the full set is
+dropped before any other kind is touched — kept sets then contain few or no
+south/north/east/west clues while uniqueness still holds.  The surviving set
+is locally minimal (a clue found necessary stays necessary, because dropping
+clues only ever grows the solution set); the caller asserts its solution
+count is exactly 1.
 """
 
 from collections.abc import Mapping
@@ -42,6 +48,9 @@ KIND_ORDER: tuple[str, ...] = (
     "room_count", "no_empty_rooms",
 )
 _KIND_RANK = {kind: i for i, kind in enumerate(KIND_ORDER)}
+
+# C1 kinds; prune_clues probes these first so kept sets stay lean of them.
+_DIRECTIONAL_KINDS = frozenset({"south", "north", "east", "west"})
 
 # op order as in the SPEC §4 clue format (sort key component #6).
 OP_ORDER: tuple[str, ...] = ("eq", "ne", "gt", "ge", "lt", "le")
@@ -133,7 +142,8 @@ def enumerate_true_clues(puzzle: Puzzle,
         room = puzzle.room_of(cell)
         rid = room.id if room is not None else 0
         standing_on = type_at.get(cell)
-        near_set = {type_at.get(nb) for nb in _neighbors(cell, height, width)}
+        near_set = {type_at.get(nb) for nb in _neighbors(cell, height, width)
+                    if room == puzzle.room_of(nb)}
         room_has = room_types.get(rid, ())
         for otype in types_present:
             fields = {"person": pid, "object_type": otype}
@@ -196,20 +206,27 @@ def enumerate_true_clues(puzzle: Puzzle,
 
 def prune_clues(puzzle: Puzzle, clues: list[dict],
                 rng: Random) -> list[dict]:
-    """Greedy SPEC §6 thinning: shuffle with ``rng``, then drop every clue
-    whose removal keeps ``count_solutions(...) == 1``.  Returns the locally
+    """Greedy SPEC §6 thinning, directional clues probed first.
+
+    Pass 1 shuffles (with ``rng``) only the C1 directional clues and probes
+    each; pass 2 does the same for every other kind.  A clue is dropped when
+    its removal keeps ``count_solutions(...) == 1``.  Returns the locally
     minimal surviving list (order: shuffled); the caller asserts that its
     solution count is exactly 1.
+
+    Determinism: one RNG stream, fixed pass order — same seed, same kept set.
 
     Probes reuse a single shared ``Geometry``, so per-probe preparation only
     rebuilds the clue-dependent masks; results are identical to plain
     ``count_solutions`` calls.
     """
     kept = list(clues)
-    order = list(clues)
-    rng.shuffle(order)
+    directional = [c for c in kept if c["kind"] in _DIRECTIONAL_KINDS]
+    others = [c for c in kept if c["kind"] not in _DIRECTIONAL_KINDS]
+    rng.shuffle(directional)
+    rng.shuffle(others)
     geometry = solver.Geometry(puzzle)
-    for clue in order:
+    for clue in (*directional, *others):
         idx = _index_of(kept, clue)
         if idx < 0:
             continue  # duplicate entry already removed

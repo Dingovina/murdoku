@@ -208,6 +208,65 @@ def test_puzzle_generation_error_is_503_json(client, monkeypatch):
     assert calls == [(1, "hard")]
 
 
+@pytest.fixture()
+def failing_generator(monkeypatch):
+    """A stub ``murdoku.generator`` whose ``generate`` always raises."""
+    generation_error = type("GenerationError", (RuntimeError,), {})
+    calls: list[tuple] = []
+
+    def exhausted_generate(seed, difficulty):
+        calls.append((seed, difficulty))
+        raise generation_error("all outer attempts failed")
+
+    module = types.ModuleType("murdoku.generator")
+    module.generate = exhausted_generate
+    module.GenerationError = generation_error
+    monkeypatch.setitem(sys.modules, "murdoku.generator", module)
+    return calls
+
+
+def test_puzzle_unseeded_retries_then_503(client, failing_generator):
+    """Without an explicit seed the server silently re-seeds up to
+    GENERATION_RETRIES times; only a full streak of failures is a 503."""
+    from murdoku.server.app import GENERATION_RETRIES
+
+    response = client.get("/api/puzzle", params={"difficulty": "hard"})
+    assert response.status_code == 503
+    assert set(response.json()) == {"error"}
+    assert len(failing_generator) == GENERATION_RETRIES
+    assert all(difficulty == "hard" for _, difficulty in failing_generator)
+    # every retry drew a fresh random seed
+    seeds = [seed for seed, _ in failing_generator]
+    assert len(set(seeds)) == GENERATION_RETRIES
+
+
+def test_puzzle_unseeded_succeeds_after_failures(
+        client, monkeypatch, puzzle, solution):
+    """Unseeded generation succeeds on the attempt after k failures."""
+    generation_error = type("GenerationError", (RuntimeError,), {})
+    calls: list[tuple] = []
+    state = {"failures_left": 2}
+
+    def flaky_generate(seed, difficulty):
+        calls.append((seed, difficulty))
+        if state["failures_left"] > 0:
+            state["failures_left"] -= 1
+            raise generation_error("outer attempts failed")
+        return SimpleNamespace(puzzle=puzzle, solution=solution)
+
+    module = types.ModuleType("murdoku.generator")
+    module.generate = flaky_generate
+    module.GenerationError = generation_error
+    monkeypatch.setitem(sys.modules, "murdoku.generator", module)
+
+    response = client.get("/api/puzzle", params={"difficulty": "easy"})
+    assert response.status_code == 200
+    assert len(calls) == 3
+    assert len({seed for seed, _ in calls}) == 3
+    payload = tokens.read_token(response.json()["token"])
+    assert payload["difficulty"] == "easy"
+
+
 # ----------------------------------------------------------------------
 # POST /api/check — 200 outcomes
 # ----------------------------------------------------------------------
