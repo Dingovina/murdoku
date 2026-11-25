@@ -58,6 +58,18 @@ function clueIsTrue(clue, placement) {
     case 'not_adjacent': return !nearObj(clue.person, clue.object_type);
     case 'room_has_object': return roomsWith(clue.object_type).has(roomOfPerson(clue.person));
     case 'room_not_has_object': return !roomsWith(clue.object_type).has(roomOfPerson(clue.person));
+    // adjacent_gender: same-room semantics — another person of the given
+    // gender in the person's own room (any person counts, victim included)
+    case 'adjacent_gender': {
+      const room = roomOfPerson(clue.person);
+      const genderOf = (id) => {
+        const p = puzzle.people.find((x) => x.id === id);
+        return p ? p.gender : null;
+      };
+      return [...placement.keys()].some((id) => id !== clue.person
+        && genderOf(id) === clue.gender
+        && roomOfPerson(id) === room);
+    }
     case 'south': return cellOf(clue.person)[0] > cellOf(clue.person2)[0];
     case 'north': return cellOf(clue.person)[0] < cellOf(clue.person2)[0];
     case 'east': return cellOf(clue.person)[1] > cellOf(clue.person2)[1];
@@ -128,7 +140,8 @@ function findSolutions() {
     }
     if (inRoom !== 2 || suspectsInRoom !== 1) return false;
     for (const clue of puzzle.clues) {
-      if (clue.kind === 'room_count' || clue.kind === 'no_empty_rooms') {
+      if (clue.kind === 'room_count' || clue.kind === 'no_empty_rooms'
+          || clue.kind === 'adjacent_gender') {
         if (!clueIsTrue(clue, assign)) return false;
       }
     }

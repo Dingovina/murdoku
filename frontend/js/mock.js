@@ -52,6 +52,12 @@ const SAMPLE_PUZZLE = {
     { kind: 'not_adjacent', person: 'suspect_1', object_type: 'bed' },
     { kind: 'room_has_object', person: 'suspect_1', object_type: 'tv' },
     { kind: 'room_not_has_object', person: 'suspect_2', object_type: 'tv' },
+    // adjacent_gender (phase 5.3, same-room semantics): the living room
+    // holds suspect_1 and suspect_3 (a man) — true for suspect_1;
+    // suspect_2 shares the dining room with the male VICTIM — the
+    // murder-room hint (the victim counts as a referent, by gender only)
+    { kind: 'adjacent_gender', person: 'suspect_1', gender: 'm' },
+    { kind: 'adjacent_gender', person: 'suspect_2', gender: 'm' },
     { kind: 'south', person: 'suspect_2', person2: 'suspect_1' },
     { kind: 'north', person: 'suspect_1', person2: 'suspect_3' },
     { kind: 'east', person: 'suspect_1', person2: 'suspect_3' },

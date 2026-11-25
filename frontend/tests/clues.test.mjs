@@ -189,6 +189,17 @@ test('subjects keep nominative real names in A/B/C templates', () => {
     ['Анна была рядом со столом и с телевизором']);
 });
 
+test('adjacent_gender renders with the instrumental noun and verb agreement', () => {
+  assert.equal(
+    namedText({ kind: 'adjacent_gender', person: 'suspect_2', gender: 'f' }),
+    'Пётр был рядом с женщиной');
+  assert.equal(
+    namedText({ kind: 'adjacent_gender', person: 'suspect_1', gender: 'm' }),
+    'Анна была рядом с мужчиной');
+  assert.throws(() => namedText(
+    { kind: 'adjacent_gender', person: 'suspect_1', gender: 'x' }));
+});
+
 test('clueToText has no trailing period', () => {
   for (const clue of [
     { kind: 'on', person: 'suspect_1', object_type: 'bed' },

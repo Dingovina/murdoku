@@ -24,7 +24,11 @@ Backtracking with MRV over per-person candidate-cell bitmasks:
   test (eq/ge/gt), and are verified exactly at complete assignments;
   ``no_empty_rooms`` is verified at complete assignments, plus cheap
   empty-rooms-vs-remaining-people prunes, and rooms no suspect can enter
-  must hold the victim.
+  must hold the victim;
+- ``adjacent_gender`` (the person's room holds another person of a given
+  gender) is verified exactly at complete assignments, with a sound
+  optimistic static prune (rooms with no gender-g candidate are dropped
+  from the person's mask).
 
 Deterministic enumeration order: candidate cells in ascending index
 (row-major), MRV ties broken by lowest person index, killer branches in
@@ -220,6 +224,7 @@ class Prepared:
     __slots__ = (
         "geometry", "people", "n_people", "victim_idx", "suspects",
         "base", "c_clues", "d1", "room_cap", "d_lower_list", "no_empty",
+        "gender_checks", "people_by_gender",
     )
 
     def __init__(self, puzzle: Puzzle, geometry: Geometry | None = None) -> None:
@@ -235,7 +240,9 @@ class Prepared:
         self.base = self._person_masks(puzzle, geo.allowed_mask)
         self._parse_c_clues(puzzle)
         self._parse_d_clues(puzzle)
+        self._parse_gender_clues(puzzle)
         self._propagate_c_clues()
+        self._prune_gender_clues()
         self._restrict_victim_mask()
 
     # -- A/B clues: static per-person cell masks -----------------------
@@ -311,6 +318,63 @@ class Prepared:
             by_person[j].append(
                 (i, -row_sign, -col_sign, room_req))
         self.c_clues = by_person
+
+    # -- adjacent_gender: room-level gender presence --------------------
+
+    def _parse_gender_clues(self, puzzle: Puzzle) -> None:
+        """``adjacent_gender`` {person, gender} — the person's room holds
+        ANOTHER person of the given gender (same-room semantics; orth-cell
+        adjacency is impossible under the distinct-rows/cols rule).  Like
+        the D clues it cannot be a per-cell mask: enforced exactly at
+        complete assignments, with a sound optimistic static prune.
+        """
+        index = {pid: i for i, pid in enumerate(self.people)}
+        by_gender: dict[str, list[int]] = {}
+        for person in puzzle.people:
+            if person.gender in ("m", "f"):
+                by_gender.setdefault(person.gender, []).append(
+                    index[person.id])
+        checks: list[tuple[int, str]] = []
+        for clue in puzzle.clues:
+            if clue.get("kind") != "adjacent_gender":
+                continue
+            i = index.get(clue.get("person"))
+            g = clue.get("gender")
+            if i is None or g not in by_gender:
+                continue
+            checks.append((i, g))
+        self.gender_checks = checks
+        self.people_by_gender = {g: tuple(v) for g, v in by_gender.items()}
+
+    def _prune_gender_clues(self) -> None:
+        """Sound optimistic static prune for adjacent_gender: a candidate
+        cell of ``person`` must lie in a room that some gender-g person
+        could still occupy (union of their current base masks — an
+        over-approximation of every solution's gender-g cells), so rooms
+        with no gender-g candidate are dropped from the mask.  Only removes
+        cells no solution uses.
+        """
+        if not self.gender_checks:
+            return
+        base = self.base
+        room_cells = self.geometry.room_cells
+        n_rooms = self.geometry.n_rooms
+        union: dict[str, int] = {}
+        for g, idxs in self.people_by_gender.items():
+            mask = 0
+            for i in idxs:
+                mask |= base[i]
+            union[g] = mask
+        for (i, g) in self.gender_checks:
+            cells = union.get(g, 0)
+            if not cells:
+                base[i] = 0  # no person of this gender exists at all
+                continue
+            allowed = 0
+            for rid in range(1, n_rooms + 1):
+                if room_cells[rid] & cells:
+                    allowed |= room_cells[rid]
+            base[i] &= allowed
 
     # -- D clues: room population --------------------------------------
 
@@ -565,6 +629,8 @@ class Prepared:
         d_lower_list = self.d_lower_list
         room_cap = self.room_cap
         no_empty = self.no_empty
+        gender_checks = self.gender_checks
+        people_by_gender = self.people_by_gender
         n_rooms = geo.n_rooms
         people = self.people
         room_cells = geo.room_cells
@@ -596,6 +662,14 @@ class Prepared:
                         return
                 if no_empty and counts.count(0) > 1:
                     return  # counts[0] is always 0 (rooms are 1-based)
+                # adjacent_gender: the person's room must hold another
+                # person of the required gender (any person counts)
+                for (p_idx, g) in gender_checks:
+                    rid = room_id_of[assigned[p_idx]]
+                    if not any(q_idx != p_idx
+                               and room_id_of[assigned[q_idx]] == rid
+                               for q_idx in people_by_gender[g]):
+                        return
                 yield {people[i]: (c // w, c % w)
                        for i, c in enumerate(assigned)}
                 return

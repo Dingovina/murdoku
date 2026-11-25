@@ -53,6 +53,7 @@ def make_clues():
          "object_type": "table"},
         {"kind": "room_not_has_object", "person": "suspect_2",
          "object_type": "bed"},
+        {"kind": "adjacent_gender", "person": "suspect_1", "gender": "f"},
         {"kind": "south", "person": "suspect_1", "person2": "suspect_2"},
         {"kind": "north", "person": "suspect_2", "person2": "suspect_1"},
         {"kind": "east", "person": "suspect_1", "person2": "suspect_2"},
@@ -439,6 +440,19 @@ class TestValidateClues:
     def test_person_equals_person2(self):
         clues = make_clues() + ({"kind": "south", "person": "suspect_1",
                                  "person2": "suspect_1"},)
+        assert_invalid(dataclasses.replace(make_puzzle(), clues=clues))
+
+    def test_adjacent_gender_bad_value(self):
+        for gender in ("x", "", "M", None, True):
+            clues = make_clues() + ({"kind": "adjacent_gender",
+                                     "person": "suspect_1",
+                                     "gender": gender},)
+            assert_invalid(dataclasses.replace(make_puzzle(), clues=clues))
+
+    def test_adjacent_gender_extra_field(self):
+        clues = make_clues() + ({"kind": "adjacent_gender",
+                                 "person": "suspect_1", "gender": "f",
+                                 "object_type": "bed"},)
         assert_invalid(dataclasses.replace(make_puzzle(), clues=clues))
 
     def test_unknown_object_type(self):

@@ -146,16 +146,28 @@ Registry (ids are English; RU display forms are a frontend concern, see §5):
 
 Clue `kind` whitelist (exact strings):
 `on, not_on, adjacent, not_adjacent, room_has_object, room_not_has_object,
-south, north, east, west, same_room, not_same_room, room_count, no_empty_rooms`.
+adjacent_gender, south, north, east, west, same_room, not_same_room,
+room_count, no_empty_rooms`.
 
 Clue dict fields: `person`, `person2` (person ids), `object_type` (registry id),
-`room` (int room id), `count` (int), `op` (str). `no_empty_rooms` has no extra fields.
+`gender` (`"m"`/`"f"`, only `adjacent_gender`), `room` (int room id), `count` (int),
+`op` (str). `no_empty_rooms` has no extra fields.
+
+`adjacent_gender` semantics (SPEC §4 B3): the person's room holds ANOTHER person
+of the given gender — any person counts (victim included, both for truth and for
+emission; its gender is public knowledge, and the clue never names the victim by
+id). Same-room, not orth-adjacent cells: two people can never occupy
+orth-adjacent cells because the distinct-rows/cols rule forbids sharing a row or
+column. For suspect-only rooms the full set already contains the stronger
+same_room clue, so the emission's genuinely new information is exactly the
+murder-room hints (victim-only rooms).
 
 ## 4. Puzzle JSON
 
-Exactly as SPEC §4: `{"width", "height", "rooms": [{"id", "cells": [{"r","c"}]}],
-"objects": [{"id","type","cells":[...]}], "people": [{"id","name","portrait_seed"}],
-"clues": [...]}`. Cell lists sorted by (r, c) for deterministic output. No solution in it.
+Exactly as SPEC §4: `{"width", "height", "rooms": [{"id", "cells": [{"r","c"}],
+"name"?, "forms"?}], "objects": [{"id","type","cells":[...]}],
+"people": [{"id","name","portrait_seed", "gender"?, "forms"?}], "clues": [...]}`.
+Cell lists sorted by (r, c) for deterministic output. No solution in it.
 
 ## 5. Russian clue text (frontend `js/clues.js`, pure functions)
 
@@ -193,6 +205,7 @@ Templates (P = person name, Q = personGenitive(person2)):
 | not_on | `{P} был не на {prep}` |
 | adjacent | `{P} был рядом {instr}` (instr already includes с/со) |
 | not_adjacent | `{P} был не рядом {instr}` |
+| adjacent_gender | `{P} был/была рядом с мужчиной/женщиной` (verb agrees with gender) |
 | room_has_object | `{P} был в комнате, где есть {nom}` |
 | room_not_has_object | `{P} был в комнате, где нет {gen}` |
 | south / north / east / west | `{P} был южнее / севернее / восточнее / западнее {Q}` |
@@ -224,12 +237,15 @@ def count_solutions(puzzle: Puzzle, limit: int = 2) -> int
     AND that instance cell lies in the same room as the person's cell (same-room
     semantics, SPEC §4) AND the person's own cell does not contain an instance of O
     (applies to both bed cells). `adj` is orth-only, a cell is not adjacent to itself.
+  - `adjacent_gender` — the person's room holds another person of the given gender
+    (same room; verified exactly at complete assignments, plus a sound optimistic
+    static prune over rooms that some gender-g person could still occupy).
   - D-counters count **all** people incl. the victim.
   - Murder room = victim's room: exactly one suspect there (all other suspects outside).
 - Algorithm: backtracking with MRV; **place the victim first** (murder-room pruning
   applies immediately after); row/col usage bitmasks; per-person cell masks precomputed
   from that person's A/B clues; C/D-clues checked on assignment events; `no_empty_rooms`
-  verified at complete assignments. Deterministic iteration order.
+  and `adjacent_gender` verified at complete assignments. Deterministic iteration order.
 - Performance: `count_solutions` on a dense 9×9 N=9 puzzle with a few hundred clues
   — target < 100 ms typical (SPEC §5). `scripts/bench_solver.py` prints measured times.
 
@@ -239,9 +255,11 @@ def count_solutions(puzzle: Puzzle, limit: int = 2) -> int
 # clues.py
 def enumerate_true_clues(puzzle: Puzzle, solution: Mapping[str, Cell]) -> list[dict]
     # deterministic order (sort key: kind order as in SPEC §4, person number, object
-    # type id, room id, count, op index); only clue domains from SPEC §6 step 5:
-    # A/B per suspect × type present on the field; C1 ordered pairs, C2/C3 unordered;
-    # D1 room × op × k ∈ 0..N (true combos only); D2 global if true.
+    # type id, gender, room id, count, op index); only clue domains from SPEC §6
+    # step 5: A/B per suspect × type present on the field; B3 adjacent_gender per
+    # suspect × gender present among the other suspects of the room; C1 ordered
+    # pairs, C2/C3 unordered; D1 room × op × k ∈ 0..N (true combos only); D2 global
+    # if true.
 def prune_clues(puzzle: Puzzle, clues: list[dict], rng: random.Random) -> list[dict]
     # two-pass greedy thinning (one rng stream): pass 1 shuffles and probes only the
     # directional C1 clues, pass 2 the rest; drop a clue if count_solutions(puzzle

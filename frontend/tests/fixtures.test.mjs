@@ -17,6 +17,7 @@ const FIXTURES = ['easy_seed_1.json', 'medium_seed_1.json'];
 const KNOWN_KINDS = new Set([
   'on', 'not_on', 'adjacent', 'not_adjacent',
   'room_has_object', 'room_not_has_object',
+  'adjacent_gender',
   'south', 'north', 'east', 'west',
   'same_room', 'not_same_room', 'room_count', 'no_empty_rooms',
 ]);
@@ -150,6 +151,7 @@ test('all clue kinds of the SPEC catalog render on real fixture data', () => {
     { kind: 'not_adjacent', person: s1, object_type: objType },
     { kind: 'room_has_object', person: s1, object_type: objType },
     { kind: 'room_not_has_object', person: s1, object_type: objType },
+    { kind: 'adjacent_gender', person: s1, gender: 'f' },
     { kind: 'south', person: s1, person2: s2 },
     { kind: 'north', person: s1, person2: s2 },
     { kind: 'east', person: s1, person2: s2 },

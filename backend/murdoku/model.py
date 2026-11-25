@@ -326,6 +326,12 @@ class Puzzle:
                     raise err(f"{where} ({kind}): unknown person2 {pid2!r}")
                 if pid2 == clue["person"]:
                     raise err(f"{where} ({kind}): person must differ from person2")
+            if "gender" in allowed:
+                gender = clue["gender"]
+                if gender not in ("m", "f"):
+                    raise err(
+                        f"{where} ({kind}): gender must be 'm' or 'f', "
+                        f"got {gender!r}")
             if "object_type" in allowed:
                 otype = clue["object_type"]
                 if not isinstance(otype, str) or otype not in OBJECT_TYPES:
@@ -473,6 +479,7 @@ _CLUE_FIELDS: dict[str, frozenset[str]] = {
     "not_adjacent": frozenset({"person", "object_type"}),
     "room_has_object": frozenset({"person", "object_type"}),
     "room_not_has_object": frozenset({"person", "object_type"}),
+    "adjacent_gender": frozenset({"person", "gender"}),
     "south": frozenset({"person", "person2"}),
     "north": frozenset({"person", "person2"}),
     "east": frozenset({"person", "person2"}),

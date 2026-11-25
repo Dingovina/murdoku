@@ -17,7 +17,7 @@ from murdoku.clues import (
 
 _DIRECTIONAL = ("south", "north", "east", "west")
 from murdoku.model import ObjectInstance, Person, Puzzle, Room
-from murdoku.solver import count_solutions
+from murdoku.solver import count_solutions, solutions
 
 
 # ----------------------------------------------------------------------
@@ -105,6 +105,17 @@ def clue_is_true(puzzle, solution, clue):
         room = puzzle.room_of(solution[clue["person"]])
         got = clue["object_type"] in room_types(puzzle, room)
         return got if kind == "room_has_object" else not got
+    if kind == "adjacent_gender":
+        # same-room semantics: another person of the given gender in the
+        # SAME ROOM (any person counts, the victim included)
+        room = puzzle.room_of(solution[clue["person"]])
+        if room is None:
+            return False
+        gender_of = {p.id: p.gender for p in puzzle.people}
+        return any(pid != clue["person"]
+                   and gender_of.get(pid) == clue["gender"]
+                   and puzzle.room_of(solution[pid]) is room
+                   for pid in solution)
     if kind in ("south", "north", "east", "west"):
         a, b = solution[clue["person"]], solution[clue["person2"]]
         return {"south": a[0] > b[0], "north": a[0] < b[0],
@@ -270,6 +281,115 @@ def test_enumerate_d1_counters_include_the_victim():
     eq1 = [c for c in clues if c["kind"] == "room_count"
            and c["room"] == 1 and c["op"] == "eq"]
     assert eq1 == [{"kind": "room_count", "room": 1, "count": 2, "op": "eq"}]
+
+
+# ----------------------------------------------------------------------
+# adjacent_gender (ideas.md phase 5.3)
+# ----------------------------------------------------------------------
+
+def gendered_people():
+    return (
+        Person("suspect_1", "Пётр", 101, "m", {"gen": "Петра", "prep": "Петре"}),
+        Person("suspect_2", "Анна", 102, "f", {"gen": "Анны", "prep": "Анне"}),
+        Person("victim", "Борис", 103, "m", {"gen": "Бориса", "prep": "Борисе"}),
+    )
+
+
+def gendered_puzzle(clues=()):
+    puzzle = Puzzle(3, 3, scenario_rooms(), (), gendered_people(),
+                    tuple(clues))
+    puzzle.validate()
+    return puzzle
+
+
+def test_adjacent_gender_emission_same_room_only():
+    """Emitted iff a suspect of that gender shares the person's room; a
+    person of the right gender in the neighbouring room does not count
+    («рядом с человеком» == same room — orth-adjacent cells are impossible
+    under the distinct-rows/cols rule)."""
+    puzzle = gendered_puzzle()
+    # both suspects in room 1 (2x2), victim in room 3
+    placement = {"suspect_1": (1, 1), "suspect_2": (0, 0), "victim": (2, 2)}
+    clues = enumerate_true_clues(puzzle, placement)
+    ag = [c for c in clues if c["kind"] == "adjacent_gender"]
+    assert {("suspect_1", "f"), ("suspect_2", "m")} == \
+        {(c["person"], c["gender"]) for c in ag}
+    # suspects split across rooms: nobody shares a room -> no emission
+    split = {"suspect_1": (1, 1), "suspect_2": (0, 2), "victim": (2, 2)}
+    assert not any(c["kind"] == "adjacent_gender"
+                   for c in enumerate_true_clues(puzzle, split))
+    # all emitted gender clues are true per the independent evaluator
+    for clue in ag:
+        assert clue_is_true(puzzle, placement, clue)
+
+
+def test_adjacent_gender_emission_counts_the_victim():
+    """The victim is a valid referent (user decision, PROGRESS 2026-11-26):
+    a suspect alone with the victim emits the victim's gender — the
+    murder-room hint.  The clue never names the victim by id."""
+    puzzle = gendered_puzzle()
+    # suspect_2 (f) alone with the male victim in room 1; suspect_1 (m)
+    # alone in room 2
+    placement = {"suspect_1": (0, 2), "suspect_2": (1, 0), "victim": (0, 0)}
+    clues = enumerate_true_clues(puzzle, placement)
+    ag = [c for c in clues if c["kind"] == "adjacent_gender"]
+    # only suspect_2 emits: the male victim is in her room; suspect_1 is
+    # alone in room 2 — no one to reference
+    assert ag == [{"kind": "adjacent_gender",
+                   "person": "suspect_2", "gender": "m"}]
+    # true per the independent evaluator (which also counts the victim)
+    assert clue_is_true(puzzle, placement, ag[0])
+    # ...and no gender clue references the victim by id
+    assert all("person2" not in c for c in ag)
+
+
+def test_adjacent_gender_solver_counts_exactly():
+    """The solver's completion check must agree with the evaluator: a
+    gender clue narrows the solution set exactly as the direct semantics
+    demand (two-solution scenario, clue kills exactly one)."""
+    # room 1 = 2x2 murder room candidates; force the pair into room 1
+    clues = [
+        {"kind": "same_room", "person": "suspect_2", "person2": "victim"},
+        {"kind": "not_same_room", "person": "suspect_1", "person2": "victim"},
+    ]
+    puzzle = gendered_puzzle(clues)
+    base = count_solutions(puzzle, 10)
+    assert base == 4  # every victim/s2 pairing on the 2x2 with distinct rows+cols
+    with_m = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people,
+                    tuple(clues) + (
+                        {"kind": "adjacent_gender",
+                         "person": "suspect_2", "gender": "m"},))
+    # suspect_2 shares room 1 with the male victim in EVERY arrangement ->
+    # the clue is true in all four; solution count must stay 4
+    assert count_solutions(with_m, 10) == 4
+    with_f = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people,
+                    tuple(clues) + (
+                        {"kind": "adjacent_gender",
+                         "person": "suspect_2", "gender": "f"},))
+    # no woman in room 1 in any arrangement -> no solutions at all
+    assert count_solutions(with_f, 10) == 0
+    # and the surviving sets agree with the independent evaluator
+    for probe in (with_m, with_f):
+        for sol in solutions(probe, 10):
+            for clue in probe.clues:
+                assert clue_is_true(probe, sol, clue)
+
+
+def test_adjacent_gender_prune_is_only_an_optimization():
+    """The static room prune never changes the solution set: puzzles with
+    and without the (redundant) prune path give identical counts."""
+    puzzle = gendered_puzzle([
+        {"kind": "same_room", "person": "suspect_1", "person2": "victim"},
+    ])
+    clue_f = {"kind": "adjacent_gender", "person": "suspect_1", "gender": "f"}
+    clue_m = {"kind": "adjacent_gender", "person": "suspect_1", "gender": "m"}
+    probe_f = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people,
+                     (clue_f,))
+    probe_m = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people,
+                     (clue_m,))
+    # victim is male: m-variant solvable, f-variant dead (vacuously)
+    assert count_solutions(probe_m, 10) > 0
+    assert count_solutions(probe_f, 10) == 0
 
 
 def test_enumerate_empty_objects_yields_no_ab_clues():

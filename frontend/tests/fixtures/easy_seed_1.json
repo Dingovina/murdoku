@@ -18,6 +18,52 @@
           "c": 2
         },
         {
+          "r": 1,
+          "c": 0
+        },
+        {
+          "r": 1,
+          "c": 1
+        },
+        {
+          "r": 1,
+          "c": 2
+        },
+        {
+          "r": 2,
+          "c": 0
+        },
+        {
+          "r": 3,
+          "c": 0
+        },
+        {
+          "r": 3,
+          "c": 1
+        },
+        {
+          "r": 4,
+          "c": 0
+        },
+        {
+          "r": 4,
+          "c": 1
+        },
+        {
+          "r": 5,
+          "c": 0
+        }
+      ],
+      "name": "Прихожая",
+      "forms": {
+        "gen": "прихожей",
+        "prep": "прихожей"
+      }
+    },
+    {
+      "id": 2,
+      "cells": [
+        {
           "r": 0,
           "c": 3
         },
@@ -31,7 +77,7 @@
         },
         {
           "r": 1,
-          "c": 1
+          "c": 3
         },
         {
           "r": 1,
@@ -51,11 +97,75 @@
         },
         {
           "r": 2,
+          "c": 3
+        },
+        {
+          "r": 2,
           "c": 4
         },
         {
           "r": 2,
           "c": 5
+        }
+      ],
+      "name": "Оранжерея",
+      "forms": {
+        "gen": "оранжереи",
+        "prep": "оранжерее"
+      }
+    },
+    {
+      "id": 3,
+      "cells": [
+        {
+          "r": 3,
+          "c": 2
+        },
+        {
+          "r": 3,
+          "c": 3
+        },
+        {
+          "r": 3,
+          "c": 4
+        },
+        {
+          "r": 3,
+          "c": 5
+        },
+        {
+          "r": 4,
+          "c": 4
+        }
+      ],
+      "name": "Балкон",
+      "forms": {
+        "gen": "балкона",
+        "prep": "балконе"
+      }
+    },
+    {
+      "id": 4,
+      "cells": [
+        {
+          "r": 4,
+          "c": 2
+        },
+        {
+          "r": 4,
+          "c": 3
+        },
+        {
+          "r": 5,
+          "c": 1
+        },
+        {
+          "r": 5,
+          "c": 2
+        },
+        {
+          "r": 5,
+          "c": 3
         }
       ],
       "name": "Кухня",
@@ -65,98 +175,8 @@
       }
     },
     {
-      "id": 2,
+      "id": 5,
       "cells": [
-        {
-          "r": 1,
-          "c": 0
-        },
-        {
-          "r": 2,
-          "c": 0
-        },
-        {
-          "r": 3,
-          "c": 0
-        },
-        {
-          "r": 3,
-          "c": 1
-        },
-        {
-          "r": 4,
-          "c": 0
-        },
-        {
-          "r": 5,
-          "c": 0
-        },
-        {
-          "r": 5,
-          "c": 1
-        },
-        {
-          "r": 5,
-          "c": 2
-        },
-        {
-          "r": 5,
-          "c": 3
-        }
-      ],
-      "name": "Кладовая",
-      "forms": {
-        "gen": "кладовой",
-        "prep": "кладовой"
-      }
-    },
-    {
-      "id": 3,
-      "cells": [
-        {
-          "r": 1,
-          "c": 2
-        },
-        {
-          "r": 1,
-          "c": 3
-        },
-        {
-          "r": 2,
-          "c": 3
-        },
-        {
-          "r": 3,
-          "c": 2
-        },
-        {
-          "r": 3,
-          "c": 3
-        },
-        {
-          "r": 3,
-          "c": 4
-        },
-        {
-          "r": 3,
-          "c": 5
-        },
-        {
-          "r": 4,
-          "c": 1
-        },
-        {
-          "r": 4,
-          "c": 2
-        },
-        {
-          "r": 4,
-          "c": 3
-        },
-        {
-          "r": 4,
-          "c": 4
-        },
         {
           "r": 4,
           "c": 5
@@ -170,79 +190,95 @@
           "c": 5
         }
       ],
-      "name": "Столовая",
+      "name": "Гостиная",
       "forms": {
-        "gen": "столовой",
-        "prep": "столовой"
+        "gen": "гостиной",
+        "prep": "гостиной"
       }
     }
   ],
   "objects": [
     {
       "id": "obj_1",
-      "type": "bed",
+      "type": "armchair",
       "cells": [
         {
-          "r": 1,
-          "c": 4
-        },
-        {
-          "r": 2,
+          "r": 5,
           "c": 4
         }
       ]
     },
     {
       "id": "obj_2",
-      "type": "table",
+      "type": "sofa",
       "cells": [
         {
-          "r": 1,
-          "c": 3
-        }
-      ]
-    },
-    {
-      "id": "obj_3",
-      "type": "tv",
-      "cells": [
-        {
-          "r": 5,
+          "r": 0,
           "c": 0
         }
       ]
     },
     {
+      "id": "obj_3",
+      "type": "wardrobe",
+      "cells": [
+        {
+          "r": 1,
+          "c": 5
+        }
+      ]
+    },
+    {
       "id": "obj_4",
-      "type": "bed",
+      "type": "table",
       "cells": [
         {
           "r": 4,
-          "c": 1
-        },
-        {
-          "r": 4,
-          "c": 2
+          "c": 4
         }
       ]
     },
     {
       "id": "obj_5",
-      "type": "fridge",
+      "type": "bed",
       "cells": [
         {
-          "r": 3,
-          "c": 1
+          "r": 0,
+          "c": 3
+        },
+        {
+          "r": 0,
+          "c": 4
         }
       ]
     },
     {
       "id": "obj_6",
+      "type": "carpet",
+      "cells": [
+        {
+          "r": 3,
+          "c": 4
+        }
+      ]
+    },
+    {
+      "id": "obj_7",
       "type": "wardrobe",
       "cells": [
         {
-          "r": 0,
-          "c": 1
+          "r": 5,
+          "c": 2
+        }
+      ]
+    },
+    {
+      "id": "obj_8",
+      "type": "fridge",
+      "cells": [
+        {
+          "r": 1,
+          "c": 2
         }
       ]
     }
@@ -250,48 +286,18 @@
   "people": [
     {
       "id": "suspect_1",
-      "name": "Нина",
-      "portrait_seed": 3920810090,
+      "name": "Кира",
+      "portrait_seed": 4122327348,
       "gender": "f",
       "forms": {
-        "gen": "Нины",
-        "prep": "Нине"
+        "gen": "Киры",
+        "prep": "Кире"
       }
     },
     {
       "id": "suspect_2",
-      "name": "Вера",
-      "portrait_seed": 1564078520,
-      "gender": "f",
-      "forms": {
-        "gen": "Веры",
-        "prep": "Вере"
-      }
-    },
-    {
-      "id": "suspect_3",
-      "name": "Софья",
-      "portrait_seed": 3984085710,
-      "gender": "f",
-      "forms": {
-        "gen": "Софьи",
-        "prep": "Софье"
-      }
-    },
-    {
-      "id": "suspect_4",
-      "name": "Дарья",
-      "portrait_seed": 3185307850,
-      "gender": "f",
-      "forms": {
-        "gen": "Дарьи",
-        "prep": "Дарье"
-      }
-    },
-    {
-      "id": "suspect_5",
       "name": "Игорь",
-      "portrait_seed": 4165053734,
+      "portrait_seed": 815351010,
       "gender": "m",
       "forms": {
         "gen": "Игоря",
@@ -299,61 +305,92 @@
       }
     },
     {
-      "id": "victim",
-      "name": "Пётр",
-      "portrait_seed": 1634354142,
+      "id": "suspect_3",
+      "name": "Ольга",
+      "portrait_seed": 2269302482,
+      "gender": "f",
+      "forms": {
+        "gen": "Ольги",
+        "prep": "Ольге"
+      }
+    },
+    {
+      "id": "suspect_4",
+      "name": "Олег",
+      "portrait_seed": 1884515995,
       "gender": "m",
       "forms": {
-        "gen": "Петра",
-        "prep": "Петре"
+        "gen": "Олега",
+        "prep": "Олеге"
+      }
+    },
+    {
+      "id": "suspect_5",
+      "name": "Эмма",
+      "portrait_seed": 2487140954,
+      "gender": "f",
+      "forms": {
+        "gen": "Эммы",
+        "prep": "Эмме"
+      }
+    },
+    {
+      "id": "victim",
+      "name": "Анна",
+      "portrait_seed": 90343240,
+      "gender": "f",
+      "forms": {
+        "gen": "Анны",
+        "prep": "Анне"
       }
     }
   ],
   "clues": [
     {
-      "kind": "not_on",
-      "person": "suspect_5",
+      "kind": "on",
+      "person": "suspect_2",
+      "object_type": "sofa"
+    },
+    {
+      "kind": "adjacent",
+      "person": "suspect_1",
+      "object_type": "wardrobe"
+    },
+    {
+      "kind": "not_adjacent",
+      "person": "suspect_1",
       "object_type": "bed"
     },
     {
-      "kind": "adjacent",
-      "person": "suspect_2",
-      "object_type": "table"
-    },
-    {
-      "kind": "adjacent",
+      "kind": "room_has_object",
       "person": "suspect_3",
       "object_type": "bed"
     },
     {
-      "kind": "not_adjacent",
+      "kind": "room_not_has_object",
       "person": "suspect_5",
-      "object_type": "bed"
+      "object_type": "sofa"
     },
     {
-      "kind": "not_adjacent",
+      "kind": "room_not_has_object",
       "person": "suspect_5",
       "object_type": "wardrobe"
     },
     {
-      "kind": "room_has_object",
-      "person": "suspect_1",
-      "object_type": "table"
+      "kind": "not_same_room",
+      "person": "suspect_2",
+      "person2": "suspect_4"
     },
     {
-      "kind": "room_has_object",
+      "kind": "not_same_room",
       "person": "suspect_3",
-      "object_type": "table"
+      "person2": "suspect_4"
     },
     {
-      "kind": "south",
-      "person": "suspect_4",
-      "person2": "suspect_1"
-    },
-    {
-      "kind": "east",
-      "person": "suspect_4",
-      "person2": "suspect_1"
+      "kind": "room_count",
+      "room": 3,
+      "count": 0,
+      "op": "le"
     }
   ]
 }

@@ -5,6 +5,9 @@ solution, restricted to the SPEC §6 step-5 domains:
 
 - A/B: each suspect × each object type **present on the field** (missing
   types are skipped — clues about them would be vacuum-true);
+- B3 (adjacent_gender): each suspect × each gender present among the OTHER
+  people of the person's room (the victim included — its gender is public,
+  and the clue never names it by id);
 - C1: all ordered suspect pairs (south/north, east/west — only the true
   direction is listed, and none if the coordinate is equal);
 - C2/C3: all unordered suspect pairs (same/different room);
@@ -46,6 +49,7 @@ Cell = tuple[int, int]
 KIND_ORDER: tuple[str, ...] = (
     "on", "not_on", "adjacent", "not_adjacent",
     "room_has_object", "room_not_has_object",
+    "adjacent_gender",
     "south", "north", "east", "west",
     "same_room", "not_same_room",
     "room_count", "no_empty_rooms",
@@ -82,6 +86,7 @@ def _sort_key(clue: dict) -> tuple:
         _KIND_RANK[kind],
         _person_rank(clue.get("person")),
         clue.get("object_type", ""),
+        clue.get("gender", ""),
         clue.get("room", -1),
         clue.get("count", -1),
         _OP_RANK.get(clue.get("op"), -1),
@@ -119,6 +124,27 @@ def enumerate_true_clues(puzzle: Puzzle,
                           **fields})
             clues.append({"kind": "room_has_object" if in_room
                           else "room_not_has_object", **fields})
+
+    # adjacent_gender: the person's room holds another person of the given
+    # gender («рядом с женщиной» — same-room semantics; orth-adjacent cells
+    # are impossible for two people under the distinct-rows/cols rule).
+    # EVERY person counts, the victim included (its gender is public
+    # knowledge; the clue never names the victim by id) — for suspect-only
+    # rooms the full set already holds the stronger same_room clue, so the
+    # new information is exactly the murder-room hints (user decision,
+    # PROGRESS 2026-11-26).
+    gender_of = {p.id: p.gender for p in puzzle.people}
+    for pid in suspects:
+        room = puzzle.room_of(solution[pid])
+        if room is None:
+            continue
+        near_genders = sorted({
+            gender_of[q] for q in puzzle.people_ids()
+            if q != pid and gender_of[q] in ("m", "f")
+            and puzzle.room_of(solution[q]) is room})
+        for g in near_genders:
+            clues.append({"kind": "adjacent_gender",
+                          "person": pid, "gender": g})
 
     # C1: ordered pairs; emit only the true direction (rows/cols of a valid
     # solution are pairwise distinct, but equality-safe all the same).

@@ -62,6 +62,8 @@ class TruthContext:
         self.room_types = room_types
         self._people = tuple(puzzle.people_ids())
         self._suspects = tuple(puzzle.suspect_ids())
+        # person id -> gender ("m"/"f"; "" = unspecified legacy)
+        self._gender = {p.id: p.gender for p in puzzle.people}
         # same-room neighbor cells per cell (same-room «рядом» semantics)
         self._near_cells: dict[Cell, frozenset[Cell]] = {}
         for cell in puzzle.playable_cells():
@@ -99,6 +101,21 @@ class TruthContext:
             got = room is not None \
                 and clue["object_type"] in self.room_types.get(room.id, ())
             return got if kind == "room_has_object" else not got
+        if kind == "adjacent_gender":
+            # same-room semantics (ideas.md phase 5.3): the person's room
+            # holds ANOTHER person of the given gender — any person counts,
+            # the victim included (orth-adjacency is impossible under the
+            # distinct-rows/cols rule, so «рядом с человеком» can only mean
+            # the shared room)
+            room = self.puzzle.room_of(placement[clue["person"]])
+            pid = clue["person"]
+            wanted = clue["gender"]
+            if room is None:
+                return False
+            return any(other != pid
+                       and self._gender.get(other) == wanted
+                       and self.puzzle.room_of(placement[other]) is room
+                       for other in self._people)
         if kind in _DIRECTIONAL:
             return _DIRECTIONAL[kind](placement[clue["person"]],
                                       placement[clue["person2"]])

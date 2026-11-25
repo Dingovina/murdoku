@@ -15,6 +15,9 @@ const OPS = { eq: 'ровно', ne: 'не', gt: 'более', ge: 'не мене
 
 const DIR = { south: 'южнее', north: 'севернее', east: 'восточнее', west: 'западнее' };
 
+// adjacent_gender noun in the instrumental («рядом с женщиной»)
+const GENDER_NOUN = { m: 'мужчиной', f: 'женщиной' };
+
 /** 1 -> "человек"; 2–4 -> "человека"; 5+ and 11–14 -> "человек". */
 export function peopleForm(k) {
   const n = Math.abs(Number(k));
@@ -104,6 +107,11 @@ export function clueToText(clue, peopleMap, roomsMap) {
     case 'not_adjacent':  return `${name(clue.person)} ${was(clue.person)} не рядом ${objForms(clue.object_type).instr}`;
     case 'room_has_object':     return `${name(clue.person)} ${was(clue.person)} в комнате, где есть ${objForms(clue.object_type).nom}`;
     case 'room_not_has_object': return `${name(clue.person)} ${was(clue.person)} в комнате, где нет ${objForms(clue.object_type).gen}`;
+    case 'adjacent_gender': {
+      const noun = GENDER_NOUN[clue.gender];
+      if (!noun) throw new Error('Unknown gender: ' + clue.gender);
+      return `${name(clue.person)} ${was(clue.person)} рядом с ${noun}`;
+    }
     case 'south':
     case 'north':
     case 'east':

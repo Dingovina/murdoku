@@ -357,9 +357,9 @@
     },
     {
       "kind": "room_count",
-      "room": 1,
+      "room": 2,
       "count": 1,
-      "op": "le"
+      "op": "gt"
     }
   ]
 }
