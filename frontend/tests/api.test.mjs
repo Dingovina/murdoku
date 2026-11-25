@@ -2,7 +2,7 @@
 // error-body mapping. window/fetch are stubbed; no real network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchPuzzle, checkAnswer } from '../js/api.js';
+import { fetchPuzzle, checkAnswer, revealSolution } from '../js/api.js';
 
 const realFetch = globalThis.fetch;
 const realWindow = globalThis.window;
@@ -90,6 +90,18 @@ test('error body {error} is mapped to the thrown message', async () => {
   await assert.rejects(() => fetchPuzzle('nope'), (err) => err.message === 'bad seed');
   await assert.rejects(() => checkAnswer('t', [], 'suspect_1'),
     (err) => err.message === 'bad seed');
+  await assert.rejects(() => revealSolution('t'), (err) => err.message === 'bad seed');
+});
+
+test('revealSolution calls GET /api/solution with the token param', async () => {
+  globalThis.window = undefined;
+  stubFetch(() => ({
+    ok: true, status: 200,
+    json: async () => ({ solution: {}, killer_id: 'suspect_1' }),
+  }));
+  const res = await revealSolution('tok');
+  assert.deepEqual(res, { solution: {}, killer_id: 'suspect_1' });
+  assert.equal(calls[0].url, '/api/solution?token=tok');
 });
 
 test('non-JSON error body falls back to "HTTP <status>"', async () => {

@@ -238,6 +238,13 @@ body {
 
 .button--accent:hover:not(:disabled) { background: #992f3f; }
 
+/* Muted actions: clear the board, give up and reveal the solution. */
+.button--secondary { color: #55555f; }
+
+#clear-board { align-self: flex-start; }
+
+#show-solution { align-self: flex-start; margin-top: 4px; }
+
 .clues {
   margin: 0;
   padding-left: 18px;

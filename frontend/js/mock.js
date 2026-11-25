@@ -180,6 +180,27 @@ export async function checkAnswer(token, placements, accusation) {
   return { won: true, solution };
 }
 
+/**
+ * GET /api/solution?token=... — mock. The sample token carries the solution;
+ * the killer is derived from the sample board (same as checkAnswer).
+ */
+export async function revealSolution(token) {
+  await sleep(120);
+  if (token === undefined || token === null || token === '') {
+    throw apiError(400, 'Отсутствует токен');
+  }
+  let payload;
+  try {
+    payload = decodeToken(token);
+  } catch {
+    throw apiError(400, 'Недействительный токен');
+  }
+  if (!payload || typeof payload.solution !== 'object' || payload.solution === null) {
+    throw apiError(400, 'Недействительный токен: нет решения');
+  }
+  return { solution: payload.solution, killer_id: sampleKiller() };
+}
+
 function sampleKiller() {
   // The only suspect in the victim's room.
   const roomOf = cellRoomMap();

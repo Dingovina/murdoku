@@ -2,7 +2,7 @@
 // puzzle consistency (all clues true, rules hold, exactly one solution).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchPuzzle, checkAnswer, SAMPLE_SOLUTION } from '../js/mock.js';
+import { fetchPuzzle, checkAnswer, revealSolution, SAMPLE_SOLUTION } from '../js/mock.js';
 
 const FULL_TYPES = new Set(['table', 'tv', 'wardrobe', 'fridge']);
 const OPS = {
@@ -250,6 +250,19 @@ test('checkAnswer: correct placement + wrong accusation', async () => {
     ({ person_id, r, c }));
   assert.deepEqual(await checkAnswer(token, placements, 'suspect_1'),
     { won: false, correct_accusation: false });
+});
+
+test('revealSolution: returns the embedded solution and the sample killer', async () => {
+  const { token } = await fetchPuzzle('easy');
+  const res = await revealSolution(token);
+  assert.deepEqual(res.solution, SAMPLE_SOLUTION);
+  // the killer is the only suspect in the victim's room 3
+  assert.equal(res.killer_id, 'suspect_2');
+});
+
+test('revealSolution: 400 on missing / garbage token', async () => {
+  await assert.rejects(() => revealSolution(undefined), (e) => e.status === 400);
+  await assert.rejects(() => revealSolution('!!!not base64!!!'), (e) => e.status === 400);
 });
 
 test('checkAnswer: 400 on malformed requests', async () => {

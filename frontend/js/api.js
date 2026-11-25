@@ -38,3 +38,16 @@ export async function checkAnswer(token, placements, accusation) {
   if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
   return body;
 }
+
+/**
+ * GET /api/solution?token=... — reveal the answer (the player gives up).
+ * @returns {Promise<{solution: object, killer_id: string}>}
+ */
+export async function revealSolution(token) {
+  if (useMock()) return mock.revealSolution(token);
+  const params = new URLSearchParams({ token: String(token) });
+  const res = await fetch('/api/solution?' + params.toString());
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}

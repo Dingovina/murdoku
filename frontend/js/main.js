@@ -1,6 +1,6 @@
 // App state, wiring, DOM. Placement rules and API calls live here.
 
-import { fetchPuzzle, checkAnswer } from './api.js';
+import { fetchPuzzle, checkAnswer, revealSolution } from './api.js';
 import { clueToText } from './clues.js';
 import { Board } from './board.js';
 
@@ -28,7 +28,7 @@ function canInteract() {
 }
 
 // Test hooks (unused in the browser flow; lets node --test reach the guards).
-export const __test = { state, canInteract };
+export const __test = { state, canInteract, clearBoard };
 
 function suspects() {
   return state.puzzle ? state.puzzle.people.filter((p) => p.id !== 'victim') : [];
@@ -50,7 +50,9 @@ function init() {
     newGame();
   });
   $('accuse') && $('accuse').addEventListener('click', accuse);
-  $('accusation') && $('accusation').addEventListener('input', updateAccuseButton);
+  $('accusation') && $('accusation').addEventListener('input', updateControls);
+  $('clear-board') && $('clear-board').addEventListener('click', clearBoard);
+  $('show-solution') && $('show-solution').addEventListener('click', giveUp);
   newGame();
 }
 
@@ -79,7 +81,7 @@ async function newGame() {
   } finally {
     state.busy = false;
     setControlsEnabled(true);
-    updateAccuseButton();
+    updateControls();
   }
 }
 
@@ -87,6 +89,8 @@ function setControlsEnabled(enabled) {
   if ($('difficulty')) $('difficulty').disabled = !enabled;
   if ($('new-game')) $('new-game').disabled = !enabled;
   if ($('accuse')) $('accuse').disabled = !enabled || !canAccuse();
+  if ($('clear-board')) $('clear-board').disabled = !enabled || !hasBoardProgress();
+  if ($('show-solution')) $('show-solution').disabled = !enabled;
 }
 
 function renderBoard() {
@@ -161,7 +165,7 @@ function tryPlace(personId, r, c) {
   board.placePerson(r, c, personById(personId));
   board.clearMisplaced();
   refreshPaletteChips();
-  updateAccuseButton();
+  updateControls();
 }
 
 /** Click a placed portrait -> back to the palette. */
@@ -174,7 +178,35 @@ function returnToPalette(personId) {
   board.removePerson(personId);
   board.clearMisplaced();
   refreshPaletteChips();
-  updateAccuseButton();
+  updateControls();
+}
+
+/**
+ * «Очистить поле»: every person back to the palette, all ✕ marks dropped.
+ * @returns {boolean} true when something was actually cleared
+ */
+function clearBoard() {
+  if (!canInteract()) return false;
+  if (!hasBoardProgress()) return false;
+  const board = state.board;
+  for (const personId of [...state.placements.keys()]) {
+    board.removePerson(personId);
+  }
+  state.placements.clear();
+  for (const key of state.marks) {
+    const [r, c] = key.split(',').map(Number);
+    board.setMark(r, c, false);
+  }
+  state.marks.clear();
+  board.clearMisplaced();
+  refreshPaletteChips();
+  updateControls();
+  return true;
+}
+
+/** True when the board holds at least one placement or ✕ mark. */
+function hasBoardProgress() {
+  return state.placements.size > 0 || state.marks.size > 0;
 }
 
 /** Click an empty cell -> toggle the red «✕» («здесь никого»). */
@@ -186,6 +218,7 @@ function toggleMark(r, c) {
   const marked = !state.marks.has(k);
   if (marked) state.marks.add(k); else state.marks.delete(k);
   board.setMark(r, c, marked);
+  updateControls();
 }
 
 function placedAt(r, c) {
@@ -211,9 +244,36 @@ function canAccuse() {
   return Boolean(state.puzzle) && allPlaced() && resolveAccusation() !== null;
 }
 
-function updateAccuseButton() {
-  const button = $('accuse');
-  if (button) button.disabled = state.busy || !canAccuse();
+/** Refresh the enable/disable state of every action button. */
+function updateControls() {
+  const accuse = $('accuse');
+  if (accuse) accuse.disabled = state.busy || state.solved || !canAccuse();
+  const clear = $('clear-board');
+  if (clear) clear.disabled = !canInteract() || !hasBoardProgress();
+  const reveal = $('show-solution');
+  if (reveal) reveal.disabled = !canInteract();
+}
+
+/** «Показать решение»: give up, reveal the answer, end the game. */
+async function giveUp() {
+  if (!canInteract()) return;
+  if (!window.confirm('Показать решение? Игра будет завершена.')) return;
+  state.busy = true;
+  setControlsEnabled(false);
+  setStatus('Получаем решение…');
+  try {
+    const { solution, killer_id } = await revealSolution(state.token);
+    state.solved = true;
+    state.board.showSolution(solution);
+    const killer = personById(killer_id);
+    setStatus(`Убийца — ${killer ? killer.name : killer_id}. Решение показано.`);
+  } catch (err) {
+    setStatus('Не удалось получить решение: ' + err.message, true);
+  } finally {
+    state.busy = false;
+    setControlsEnabled(true);
+    updateControls(); // solved: interactions stay blocked, new game works
+  }
 }
 
 async function accuse() {
@@ -249,7 +309,7 @@ async function accuse() {
   } finally {
     state.busy = false;
     setControlsEnabled(true);
-    updateAccuseButton();
+    updateControls();
   }
 }
 

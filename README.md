@@ -98,9 +98,10 @@ frontend/
 ## API
 
 - `GET /api/puzzle?difficulty={easy|medium|hard|expert}[&seed=N]` →
-  `200 {"puzzle": {...}, "token": "..."}`; без `seed` — случайный seed;
-  неизвестная сложность/плохой seed → `400 {"error"}`; исчерпание попыток
-  генератора → `503 {"error"}`.
+  `200 {"puzzle": {...}, "token": "..."}`; без `seed` — случайный seed (при неудаче
+  генерации сервер сам делает до 5 попыток с новыми seed); с явным `seed` — ровно
+  одна детерминированная попытка; неизвестная сложность/плохой seed → `400 {"error"}`;
+  исчерпание попыток генератора → `503 {"error"}`.
 - `POST /api/check` с телом `{"token", "placements": [{person_id, r, c}...],
   "accusation": person_id}`:
   - победа: `{"won": true, "solution": {...}}`;
@@ -109,4 +110,6 @@ frontend/
     последним»;
   - расстановка верна, обвинение нет: `{"won": false, "correct_accusation": false}`;
   - битый запрос/токен: `400 {"error"}`.
+- `GET /api/solution?token=...` → `200 {"solution": {...}, "killer_id": "..."}` —
+  сдаться и увидеть ответ (битый токен → `400 {"error"}`).
 - `/` — статика фронтенда.

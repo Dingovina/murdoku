@@ -276,6 +276,9 @@ def generate(seed: int, difficulty: str) -> GenerationResult
   in the token (the server has no puzzle there to recompute rooms).
   `MURDOKU_SECRET` required; if unset and `MURDOKU_DEV=1` → random per-process key +
   stderr warning (tokens die on restart); if unset otherwise → refuse to start.
+- `GET /api/solution?token=...` → `200 {"solution": {pid: [r,c]}, "killer_id"}` —
+  reveal endpoint (the player gives up); missing/invalid token or a token without
+  solution/killer_id → `400 {"error"}`. Stateless: data comes from the token.
 - Static: repo-root `frontend/` mounted at `/` (StaticFiles, html=True).
 - Entry: `python -m murdoku.server` → uvicorn on `MURDOKU_HOST`/`MURDOKU_PORT`
   (default 127.0.0.1:8000). Out-of-field coords in placements are simply "wrong cells"

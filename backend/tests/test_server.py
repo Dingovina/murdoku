@@ -347,6 +347,41 @@ def test_check_all_correct_but_wrong_accusation(
 
 
 # ----------------------------------------------------------------------
+# GET /api/solution — reveal (the player gives up)
+# ----------------------------------------------------------------------
+
+
+def test_solution_reveal(client, token, solution, killer_id):
+    response = client.get("/api/solution", params={"token": token})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["solution"] == {
+        pid: [r, c] for pid, (r, c) in solution.items()
+    }
+    assert body["killer_id"] == killer_id
+
+
+def test_solution_reveal_missing_token(client):
+    response = client.get("/api/solution")
+    assert response.status_code == 400
+    assert "error" in response.json()
+
+
+def test_solution_reveal_invalid_token(client):
+    response = client.get("/api/solution", params={"token": "garbage"})
+    assert response.status_code == 400
+    assert "error" in response.json()
+
+
+def test_solution_reveal_token_without_payload_fields(client, token):
+    """A structurally valid token lacking solution/killer_id is rejected."""
+    stripped = tokens.make_token({"game_id": "0" * 32})
+    response = client.get("/api/solution", params={"token": stripped})
+    assert response.status_code == 400
+    assert "solution/killer_id" in response.json()["error"]
+
+
+# ----------------------------------------------------------------------
 # POST /api/check — 400 branches
 # ----------------------------------------------------------------------
 

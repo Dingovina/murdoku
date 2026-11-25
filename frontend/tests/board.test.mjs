@@ -386,3 +386,47 @@ test('main.js canInteract: false while busy or solved or without puzzle', async 
     Object.assign(state, saved);
   }
 });
+
+test('main.js clearBoard: people back to palette, marks dropped, guards hold', async () => {
+  const { __test } = await import('../js/main.js');
+  const { state, clearBoard } = __test;
+  const saved = { ...state };
+  const savedPlacements = state.placements;
+  const savedMarks = state.marks;
+  state.placements = new Map();
+  state.marks = new Set();
+  try {
+    const calls = [];
+    state.puzzle = {};
+    state.board = {
+      removePerson: (id) => calls.push(['rm', id]),
+      setMark: (r, c, m) => calls.push(['mark', r, c, m]),
+      clearMisplaced: () => calls.push(['clear']),
+    };
+    state.busy = false;
+    state.solved = false;
+
+    // empty board -> no-op
+    assert.equal(clearBoard(), false);
+    assert.deepEqual(calls, []);
+
+    state.placements.set('suspect_1', { r: 0, c: 1 });
+    state.marks.add('2,2');
+    assert.equal(clearBoard(), true);
+    assert.equal(state.placements.size, 0);
+    assert.equal(state.marks.size, 0);
+    assert.deepEqual(calls, [
+      ['rm', 'suspect_1'], ['mark', 2, 2, false], ['clear'],
+    ]);
+
+    // busy -> blocked, board untouched
+    state.placements.set('victim', { r: 1, c: 1 });
+    state.busy = true;
+    assert.equal(clearBoard(), false);
+    assert.equal(state.placements.size, 1, 'busy state blocks clearing');
+  } finally {
+    Object.assign(state, saved);
+    state.placements = savedPlacements;
+    state.marks = savedMarks;
+  }
+});

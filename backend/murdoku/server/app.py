@@ -214,9 +214,35 @@ async def api_check(request: Request) -> JSONResponse:
     return JSONResponse({"won": False, "correct_accusation": False})
 
 
+async def api_solution(request: Request) -> JSONResponse:
+    """GET /api/solution?token=... — reveal the answer (the player gives up).
+
+    The token is the same anti-cheat token issued by /api/puzzle; the server
+    stays stateless.  This is a deliberate surrender: the frontend ends the
+    game after calling it.
+    """
+    token = request.query_params.get("token")
+    if not token:
+        return _error("missing token")
+    try:
+        payload = tokens.read_token(token)
+    except tokens.InvalidToken:
+        return _error("invalid token")
+    raw_solution = payload.get("solution")
+    killer_id = payload.get("killer_id")
+    if not isinstance(raw_solution, dict) or not raw_solution \
+            or not isinstance(killer_id, str):
+        return _error("invalid token: solution/killer_id missing")
+    return JSONResponse({
+        "solution": raw_solution,
+        "killer_id": killer_id,
+    })
+
+
 routes = [
     Route("/api/puzzle", api_puzzle, methods=["GET"]),
     Route("/api/check", api_check, methods=["POST"]),
+    Route("/api/solution", api_solution, methods=["GET"]),
     Mount("/", StaticFiles(directory=FRONTEND_DIR, html=True),
           name="frontend"),
 ]
