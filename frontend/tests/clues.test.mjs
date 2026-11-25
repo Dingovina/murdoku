@@ -125,6 +125,70 @@ test('personGenitive', () => {
   assert.equal(personGenitive('Убитый'), 'Убитого');
 });
 
+// --- names and explicit case forms (ideas.md v2, phase 5) ---
+
+const NAMED_PEOPLE = new Map([
+  ['suspect_1', { id: 'suspect_1', name: 'Анна', gender: 'f', forms: { gen: 'Анны', prep: 'Анне' } }],
+  ['suspect_2', { id: 'suspect_2', name: 'Пётр', gender: 'm', forms: { gen: 'Петра', prep: 'Петре' } }],
+  ['suspect_3', { id: 'suspect_3', name: 'Подозреваемый_3' }], // legacy: no forms
+]);
+const NAMED_ROOMS = new Map([
+  [3, { id: 3, name: 'Спальня', forms: { gen: 'спальни', prep: 'спальне' } }],
+  [1, { id: 1, name: 'Кухня', forms: { gen: 'кухни', prep: 'кухне' } }],
+]);
+
+function namedText(clue) { return clueToText(clue, NAMED_PEOPLE, NAMED_ROOMS); }
+
+test('directional clues use the explicit forms.gen for person2', () => {
+  assert.equal(
+    namedText({ kind: 'south', person: 'suspect_1', person2: 'suspect_2' }),
+    'Анна была южнее Петра');
+  assert.equal(
+    namedText({ kind: 'east', person: 'suspect_2', person2: 'suspect_1' }),
+    'Пётр был восточнее Анны');
+  // «Пётр был севернее…» — the subject stays nominative, no declension
+  assert.equal(
+    namedText({ kind: 'north', person: 'suspect_2', person2: 'suspect_1' }),
+    'Пётр был севернее Анны');
+});
+
+test('legacy people without forms fall back to the heuristic decline', () => {
+  assert.equal(
+    namedText({ kind: 'west', person: 'suspect_1', person2: 'suspect_3' }),
+    'Анна была западнее Подозреваемого_3');
+});
+
+test('room_count renders the room name in prepositional (lowercase)', () => {
+  assert.equal(
+    namedText({ kind: 'room_count', room: 3, count: 2, op: 'eq' }),
+    'В спальне было ровно 2 человека');
+  assert.equal(
+    namedText({ kind: 'room_count', room: 1, count: 1, op: 'gt' }),
+    'В кухне было более 1 человека');
+  // unknown room id -> legacy fallback even with a roomsMap
+  assert.equal(
+    namedText({ kind: 'room_count', room: 9, count: 2, op: 'eq' }),
+    'В комнате_9 было ровно 2 человека');
+  // no roomsMap at all -> legacy fallback
+  assert.equal(
+    clueToText({ kind: 'room_count', room: 3, count: 2, op: 'eq' }, NAMED_PEOPLE),
+    'В комнате_3 было ровно 2 человека');
+});
+
+test('subjects keep nominative real names in A/B/C templates', () => {
+  assert.equal(
+    namedText({ kind: 'on', person: 'suspect_1', object_type: 'bed' }),
+    'Анна была на кровати');
+  assert.equal(
+    namedText({ kind: 'same_room', person: 'suspect_1', person2: 'suspect_2' }),
+    'Анна и Пётр были в одной комнате');
+  assert.deepEqual(
+    clueListToTexts(
+      [adj('suspect_1', 'table'), adj('suspect_1', 'tv')],
+      NAMED_PEOPLE, NAMED_ROOMS),
+    ['Анна была рядом со столом и с телевизором']);
+});
+
 test('clueToText has no trailing period', () => {
   for (const clue of [
     { kind: 'on', person: 'suspect_1', object_type: 'bed' },

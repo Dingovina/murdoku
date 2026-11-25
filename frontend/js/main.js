@@ -109,15 +109,16 @@ function renderClues() {
   if (!list) return;
   list.innerHTML = '';
   const peopleMap = new Map(state.puzzle.people.map((p) => [p.id, p]));
+  const roomsMap = new Map(state.puzzle.rooms.map((room) => [room.id, room]));
   let texts;
   try {
-    texts = clueListToTexts(state.puzzle.clues, peopleMap);
+    texts = clueListToTexts(state.puzzle.clues, peopleMap, roomsMap);
   } catch (err) {
     // fall back to per-clue rendering so the error line names the culprit
     texts = [];
     for (const clue of state.puzzle.clues) {
       try {
-        texts.push(clueListToTexts([clue], peopleMap)[0]);
+        texts.push(clueListToTexts([clue], peopleMap, roomsMap)[0]);
       } catch (inner) {
         texts.push('Неизвестная подсказка (' + inner.message + ')');
       }

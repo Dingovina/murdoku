@@ -160,10 +160,17 @@ Exactly as SPEC §4: `{"width", "height", "rooms": [{"id", "cells": [{"r","c"}]}
 ## 5. Russian clue text (frontend `js/clues.js`, pure functions)
 
 ```js
-clueToText(clue, /* map person_id -> person */) -> string   // no trailing period
+clueToText(clue, /* map person_id -> person */, /* optional map room_id -> room */)
+    -> string   // no trailing period
 peopleForm(k)      // "человек" | "человека" | "человек"  (1; 2–4; 5+; 11–14 → человек)
-personGenitive(name) // "Подозреваемый_3" -> "Подозреваемого_3"; "Убитый" -> "Убитого"
+personGenitive(name) // legacy heuristic decline ("Подозреваемый_3" -> "Подозреваемого_3")
 ```
+
+Names and inflection (ideas.md v2): the puzzle JSON carries `gender` and explicit
+`forms` {gen, prep} for people and `name`/`forms` for rooms; `clueToText` prefers
+them (`была` for `gender === "f"`; «южнее Дарьи»; «В спальне было…») and falls back
+to the legacy placeholders/heuristics when the fields are absent. Rooms never get
+a capital letter mid-sentence («В» is the capitalized word).
 
 Object RU forms (used by templates):
 

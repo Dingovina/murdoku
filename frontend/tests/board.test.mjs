@@ -116,15 +116,25 @@ test('walls: board edges, room boundaries and voids; none inside a room', () => 
   assert.ok(classes(cellOf(board, 3, 1)).includes('wall-bottom'));
 });
 
-test('room number badge sits on the room corner cell only', () => {
+test('room badge shows the room name on the corner cell only', () => {
   const board = makeBoard();
   const badge = (el) => {
     const b = el._children.find((c) => c.classList.contains('room-badge'));
     return b ? b.textContent : null;
   };
-  assert.equal(badge(cellOf(board, 0, 0)), '1');
+  assert.equal(badge(cellOf(board, 0, 0)), 'Спальня');
   assert.equal(badge(cellOf(board, 1, 1)), null, 'non-corner cell of room 1');
-  assert.equal(badge(cellOf(board, 2, 4)), '5', 'corner of room 5');
+  assert.equal(badge(cellOf(board, 2, 4)), 'Оранжерея', 'corner of room 5');
+});
+
+test('room badge falls back to the numeric id for unnamed rooms', () => {
+  // L_PUZZLE below has legacy rooms without names
+  const board = new Board(new FakeEl('div'), L_PUZZLE);
+  const badge = (el) => {
+    const b = el._children.find((c) => c.classList.contains('room-badge'));
+    return b ? b.textContent : null;
+  };
+  assert.equal(badge(board.cellEl(0, 0)), '1');
 });
 
 test('mergeable table pair renders as one icon over the union bbox', () => {
@@ -257,7 +267,7 @@ test('placePerson / removePerson / misplaced outline', () => {
   board.placePerson(0, 5, person('suspect_1'));
   const chip = cellOf(board, 0, 5)._children.find((c) => c.classList.contains('chip'));
   assert.ok(chip, 'chip rendered');
-  assert.equal(chip.title, 'Подозреваемый_1');
+  assert.equal(chip.title, 'Борис');
   board.setMisplaced('suspect_1', true);
   assert.ok(chip.classList.contains('chip--misplaced'));
   board.clearMisplaced();

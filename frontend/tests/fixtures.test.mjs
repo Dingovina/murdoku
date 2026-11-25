@@ -33,14 +33,15 @@ const PREP_FORM = {
 function loadFixture(name) {
   const puzzle = JSON.parse(readFileSync(FIXTURE_DIR + name, 'utf8'));
   const peopleMap = new Map(puzzle.people.map((p) => [p.id, p]));
-  return { puzzle, peopleMap };
+  const roomsMap = new Map(puzzle.rooms.map((r) => [r.id, r]));
+  return { puzzle, peopleMap, roomsMap };
 }
 
-function renderAll(puzzle, peopleMap) {
+function renderAll(puzzle, peopleMap, roomsMap) {
   return puzzle.clues.map((clue) => {
     let text;
     try {
-      text = clueToText(clue, peopleMap);
+      text = clueToText(clue, peopleMap, roomsMap);
     } catch (err) {
       throw new Error(
         `clueToText threw on ${JSON.stringify(clue)}: ${err.message}`);
@@ -83,8 +84,8 @@ for (const name of FIXTURES) {
   });
 
   test(`fixture ${name}: every clue renders to non-empty Russian text`, () => {
-    const { puzzle, peopleMap } = loadFixture(name);
-    for (const { clue, text } of renderAll(puzzle, peopleMap)) {
+    const { puzzle, peopleMap, roomsMap } = loadFixture(name);
+    for (const { clue, text } of renderAll(puzzle, peopleMap, roomsMap)) {
       assert.equal(typeof text, 'string');
       assert.ok(text.length > 0, `non-empty text for ${JSON.stringify(clue)}`);
       assert.match(text, CYRILLIC, `Cyrillic in ${JSON.stringify(clue)}`);
@@ -94,20 +95,41 @@ for (const name of FIXTURES) {
     }
   });
 
+  test(`fixture ${name}: names carry gender and explicit case forms`, () => {
+    const { puzzle, roomsMap } = loadFixture(name);
+    const names = puzzle.people.map((p) => p.name);
+    assert.equal(new Set(names).size, names.length, 'distinct people names');
+    for (const person of puzzle.people) {
+      assert.ok(['m', 'f'].includes(person.gender), `gender: ${person.name}`);
+      assert.ok(person.forms && person.forms.gen && person.forms.prep,
+        `forms: ${person.name}`);
+    }
+    const roomNames = puzzle.rooms.map((r) => r.name);
+    assert.equal(new Set(roomNames).size, roomNames.length, 'distinct room names');
+    for (const room of puzzle.rooms) {
+      assert.ok(room.name, `room ${room.id} named`);
+      assert.equal(roomsMap.get(room.id).forms.prep, room.forms.prep);
+    }
+  });
+
   test(`fixture ${name}: person/direction clue text matches templates`, () => {
-    const { puzzle, peopleMap } = loadFixture(name);
+    const { puzzle, peopleMap, roomsMap } = loadFixture(name);
     const suspect1 = puzzle.people.find((p) => p.id === 'suspect_1');
     const suspect2 = puzzle.people.find((p) => p.id === 'suspect_2');
     const objType = puzzle.objects[0].type;
+    const was1 = suspect1.gender === 'f' ? 'была' : 'был';
     assert.equal(
-      clueToText({ kind: 'south', person: suspect1.id, person2: suspect2.id }, peopleMap),
-      `${suspect1.name} был южнее ${personGenitive(suspect2.name)}`);
+      clueToText({ kind: 'south', person: suspect1.id, person2: suspect2.id },
+        peopleMap, roomsMap),
+      `${suspect1.name} ${was1} южнее ${suspect2.forms.gen}`);
     assert.equal(
-      clueToText({ kind: 'same_room', person: suspect1.id, person2: suspect2.id }, peopleMap),
+      clueToText({ kind: 'same_room', person: suspect1.id, person2: suspect2.id },
+        peopleMap, roomsMap),
       `${suspect1.name} и ${suspect2.name} были в одной комнате`);
     assert.equal(
-      clueToText({ kind: 'on', person: suspect1.id, object_type: objType }, peopleMap),
-      `${suspect1.name} был на ${PREP_FORM[objType]}`);
+      clueToText({ kind: 'on', person: suspect1.id, object_type: objType },
+        peopleMap, roomsMap),
+      `${suspect1.name} ${was1} на ${PREP_FORM[objType]}`);
   });
 }
 
@@ -115,8 +137,9 @@ test('all clue kinds of the SPEC catalog render on real fixture data', () => {
   // Anchored to real ids from the medium fixture, so the whole SPEC §4
   // catalog is exercised even when the fixtures' own clue sets cover a
   // smaller subset of kinds.
-  const { puzzle, peopleMap } = loadFixture('medium_seed_1.json');
+  const { puzzle, peopleMap, roomsMap } = loadFixture('medium_seed_1.json');
   const roomId = puzzle.rooms[0].id;
+  const roomPrep = puzzle.rooms[0].forms.prep; // "балконе" (lowercase)
   const s1 = puzzle.people.find((p) => p.id === 'suspect_1').id;
   const s2 = puzzle.people.find((p) => p.id === 'suspect_2').id;
   const objType = puzzle.objects[0].type;
@@ -136,23 +159,24 @@ test('all clue kinds of the SPEC catalog render on real fixture data', () => {
     { kind: 'room_count', room: roomId, count: 2, op: 'eq' },
     { kind: 'no_empty_rooms' },
   ];
-  const rendered = clues.map((clue) => ({ clue, text: clueToText(clue, peopleMap) }));
+  const rendered = clues.map((clue) => (
+    { clue, text: clueToText(clue, peopleMap, roomsMap) }));
   for (const { clue, text } of rendered) {
     assert.ok(text.length > 0, `non-empty for ${clue.kind}`);
     assert.match(text, CYRILLIC, `Cyrillic for ${clue.kind}`);
     assert.ok(!/undefined|\[object/.test(text), `sane text for ${clue.kind}: ${text}`);
   }
   // spot checks on the D1 template incl. pluralization agreement
-  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 1, op: 'eq' }, peopleMap),
-    `В комнате_${roomId} было ровно 1 человек`);
-  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 2, op: 'eq' }, peopleMap),
-    `В комнате_${roomId} было ровно 2 человека`);
-  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 5, op: 'eq' }, peopleMap),
-    `В комнате_${roomId} было ровно 5 человек`);
-  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 1, op: 'gt' }, peopleMap),
-    `В комнате_${roomId} было более 1 человека`);
-  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 2, op: 'ge' }, peopleMap),
-    `В комнате_${roomId} было не менее 2 человек`);
+  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 1, op: 'eq' }, peopleMap, roomsMap),
+    `В ${roomPrep} было ровно 1 человек`);
+  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 2, op: 'eq' }, peopleMap, roomsMap),
+    `В ${roomPrep} было ровно 2 человека`);
+  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 5, op: 'eq' }, peopleMap, roomsMap),
+    `В ${roomPrep} было ровно 5 человек`);
+  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 1, op: 'gt' }, peopleMap, roomsMap),
+    `В ${roomPrep} было более 1 человека`);
+  assert.equal(clueToText({ kind: 'room_count', room: roomId, count: 2, op: 'ge' }, peopleMap, roomsMap),
+    `В ${roomPrep} было не менее 2 человек`);
 });
 
 test('morphology spot checks: personGenitive and peopleForm', () => {

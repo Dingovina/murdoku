@@ -41,6 +41,7 @@ export class Board {
     this.playable = new Set();
     this.roomOfCell = new Map();
     this.roomCorners = new Map(); // room id -> "r,c"
+    this.roomById = new Map(rooms.map((room) => [room.id, room]));
     for (const room of rooms) {
       for (const cell of room.cells) {
         const k = key(cell.r, cell.c);
@@ -119,7 +120,11 @@ export class Board {
     if (corner && corner.r === r && corner.c === c) {
       const badge = document.createElement('span');
       badge.className = 'room-badge';
-      badge.textContent = String(roomId);
+      // D1 clues name the room ("В спальне было…"), so the badge shows the
+      // room NAME when the puzzle has one (ideas.md v2 names); the numeric
+      // id remains the fallback for legacy puzzles.
+      const room = this.roomById.get(roomId);
+      badge.textContent = (room && room.name) || String(roomId);
       el.appendChild(badge);
     }
 

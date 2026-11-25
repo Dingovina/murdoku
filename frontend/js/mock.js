@@ -8,11 +8,11 @@ const SAMPLE_PUZZLE = {
   width: 6,
   height: 6,
   rooms: [
-    { id: 1, cells: [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }, { r: 1, c: 0 }, { r: 1, c: 1 }, { r: 1, c: 2 }] },
-    { id: 2, cells: [{ r: 0, c: 3 }, { r: 0, c: 4 }, { r: 0, c: 5 }, { r: 1, c: 3 }, { r: 1, c: 4 }, { r: 1, c: 5 }] },
-    { id: 3, cells: [{ r: 2, c: 0 }, { r: 2, c: 1 }, { r: 3, c: 0 }, { r: 3, c: 1 }] },
-    { id: 4, cells: [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }] },
-    { id: 5, cells: [{ r: 2, c: 4 }, { r: 2, c: 5 }, { r: 3, c: 4 }, { r: 3, c: 5 }, { r: 4, c: 4 }, { r: 4, c: 5 }, { r: 5, c: 4 }, { r: 5, c: 5 }] },
+    { id: 1, name: 'Спальня', forms: { gen: 'спальни', prep: 'спальне' }, cells: [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }, { r: 1, c: 0 }, { r: 1, c: 1 }, { r: 1, c: 2 }] },
+    { id: 2, name: 'Гостиная', forms: { gen: 'гостиной', prep: 'гостиной' }, cells: [{ r: 0, c: 3 }, { r: 0, c: 4 }, { r: 0, c: 5 }, { r: 1, c: 3 }, { r: 1, c: 4 }, { r: 1, c: 5 }] },
+    { id: 3, name: 'Столовая', forms: { gen: 'столовой', prep: 'столовой' }, cells: [{ r: 2, c: 0 }, { r: 2, c: 1 }, { r: 3, c: 0 }, { r: 3, c: 1 }] },
+    { id: 4, name: 'Кухня', forms: { gen: 'кухни', prep: 'кухне' }, cells: [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }] },
+    { id: 5, name: 'Оранжерея', forms: { gen: 'оранжереи', prep: 'оранжерее' }, cells: [{ r: 2, c: 4 }, { r: 2, c: 5 }, { r: 3, c: 4 }, { r: 3, c: 5 }, { r: 4, c: 4 }, { r: 4, c: 5 }, { r: 5, c: 4 }, { r: 5, c: 5 }] },
   ],
   // Void: (4,0..3), (5,0..3) — covered by no room.
   objects: [
@@ -35,11 +35,11 @@ const SAMPLE_PUZZLE = {
     { id: 'obj_12', type: 'carpet', cells: [{ r: 2, c: 0 }] },
   ],
   people: [
-    { id: 'suspect_1', name: 'Подозреваемый_1', portrait_seed: 120483 },
-    { id: 'suspect_2', name: 'Подозреваемый_2', portrait_seed: 3055571 },
-    { id: 'suspect_3', name: 'Подозреваемый_3', portrait_seed: 77021544 },
-    { id: 'suspect_4', name: 'Подозреваемый_4', portrait_seed: 4289135632 },
-    { id: 'victim', name: 'Убитый', portrait_seed: 3864129075 },
+    { id: 'suspect_1', name: 'Борис', gender: 'm', portrait_seed: 120483, forms: { gen: 'Бориса', prep: 'Борисе' } },
+    { id: 'suspect_2', name: 'Анна', gender: 'f', portrait_seed: 3055571, forms: { gen: 'Анны', prep: 'Анне' } },
+    { id: 'suspect_3', name: 'Фёдор', gender: 'm', portrait_seed: 77021544, forms: { gen: 'Фёдора', prep: 'Фёдоре' } },
+    { id: 'suspect_4', name: 'Вера', gender: 'f', portrait_seed: 4289135632, forms: { gen: 'Веры', prep: 'Вере' } },
+    { id: 'victim', name: 'Пётр', gender: 'm', portrait_seed: 3864129075, forms: { gen: 'Петра', prep: 'Петре' } },
   ],
   clues: [
     { kind: 'on', person: 'suspect_4', object_type: 'armchair' },

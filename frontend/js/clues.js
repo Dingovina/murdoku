@@ -58,29 +58,64 @@ function personName(peopleMap, id) {
 }
 
 /**
+ * Genitive of a person: the explicit ``forms.gen`` from the puzzle data
+ * when present (real names — ideas.md v2), otherwise the legacy heuristic
+ * decline ("Подозреваемый_3" -> "Подозреваемого_3").
+ */
+function personGen(peopleMap, id) {
+  const p = peopleMap.get(id);
+  if (!p) throw new Error('Unknown person id: ' + id);
+  if (p.forms && p.forms.gen) return p.forms.gen;
+  return personGenitive(p.name);
+}
+
+/** Past-tense "был/была" agreeing with the person's gender (unspecified
+ *  gender — legacy placeholders — renders masculine). */
+function wasVerb(peopleMap, id) {
+  const p = peopleMap.get(id);
+  if (!p) throw new Error('Unknown person id: ' + id);
+  return p.gender === 'f' ? 'была' : 'был';
+}
+
+/**
+ * Prepositional form of a room ("спальне"), or null when the room carries
+ * no explicit forms (legacy room -> "Комната_{id}" fallback).  Lowercase:
+ * in the sentence only the leading "В" is capitalised.
+ */
+function roomPrep(roomsMap, roomId) {
+  const room = roomsMap && roomsMap.get(roomId);
+  return room && room.forms && room.forms.prep ? room.forms.prep : null;
+}
+
+/**
  * Render one clue to Russian text (no trailing period).
  * @param {object} clue clue dict (SPEC §4 format)
- * @param {Map<string, {id: string, name: string}>} peopleMap person_id -> person
+ * @param {Map<string, {id: string, name: string, forms?: object}>} peopleMap
+ * @param {Map<number, {id: number, name?: string, forms?: object}>} [roomsMap]
+ *        room id -> room; optional (legacy callers render "Комната_{id}")
  */
-export function clueToText(clue, peopleMap) {
+export function clueToText(clue, peopleMap, roomsMap) {
   const name = (id) => personName(peopleMap, id);
+  const was = (id) => wasVerb(peopleMap, id);
   switch (clue.kind) {
-    case 'on':            return `${name(clue.person)} был на ${objForms(clue.object_type).prep}`;
-    case 'not_on':        return `${name(clue.person)} был не на ${objForms(clue.object_type).prep}`;
-    case 'adjacent':      return `${name(clue.person)} был рядом ${objForms(clue.object_type).instr}`;
-    case 'not_adjacent':  return `${name(clue.person)} был не рядом ${objForms(clue.object_type).instr}`;
-    case 'room_has_object':     return `${name(clue.person)} был в комнате, где есть ${objForms(clue.object_type).nom}`;
-    case 'room_not_has_object': return `${name(clue.person)} был в комнате, где нет ${objForms(clue.object_type).gen}`;
+    case 'on':            return `${name(clue.person)} ${was(clue.person)} на ${objForms(clue.object_type).prep}`;
+    case 'not_on':        return `${name(clue.person)} ${was(clue.person)} не на ${objForms(clue.object_type).prep}`;
+    case 'adjacent':      return `${name(clue.person)} ${was(clue.person)} рядом ${objForms(clue.object_type).instr}`;
+    case 'not_adjacent':  return `${name(clue.person)} ${was(clue.person)} не рядом ${objForms(clue.object_type).instr}`;
+    case 'room_has_object':     return `${name(clue.person)} ${was(clue.person)} в комнате, где есть ${objForms(clue.object_type).nom}`;
+    case 'room_not_has_object': return `${name(clue.person)} ${was(clue.person)} в комнате, где нет ${objForms(clue.object_type).gen}`;
     case 'south':
     case 'north':
     case 'east':
-    case 'west':          return `${name(clue.person)} был ${DIR[clue.kind]} ${personGenitive(name(clue.person2))}`;
+    case 'west':          return `${name(clue.person)} ${was(clue.person)} ${DIR[clue.kind]} ${personGen(peopleMap, clue.person2)}`;
     case 'same_room':     return `${name(clue.person)} и ${name(clue.person2)} были в одной комнате`;
     case 'not_same_room': return `${name(clue.person)} и ${name(clue.person2)} были в разных комнатах`;
     case 'room_count': {
       const op = OPS[clue.op];
       if (!op) throw new Error('Unknown op: ' + clue.op);
-      return `В комнате_${clue.room} было ${op} ${clue.count} ${d1Noun(clue.count, clue.op)}`;
+      const place = roomPrep(roomsMap, clue.room);
+      const where = place ? `В ${place}` : `В комнате_${clue.room}`;
+      return `${where} было ${op} ${clue.count} ${d1Noun(clue.count, clue.op)}`;
     }
     case 'no_empty_rooms': return 'Пустых комнат не было';
     default: throw new Error('Unknown clue kind: ' + clue.kind);
@@ -94,10 +129,11 @@ export function clueToText(clue, peopleMap) {
  * consecutive same-kind + same-person clues in the given order, everything
  * else renders via clueToText one line per clue.
  * @param {object[]} clues clue dicts (SPEC §4 format)
- * @param {Map<string, {id: string, name: string}>} peopleMap
+ * @param {Map<string, {id: string, name: string, forms?: object}>} peopleMap
+ * @param {Map<number, {id: number, name?: string, forms?: object}>} [roomsMap]
  * @returns {string[]} one string per displayed line, order preserved
  */
-export function clueListToTexts(clues, peopleMap) {
+export function clueListToTexts(clues, peopleMap, roomsMap) {
   const out = [];
   let i = 0;
   while (i < clues.length) {
@@ -111,14 +147,16 @@ export function clueListToTexts(clues, peopleMap) {
         j++;
       }
       if (group.length > 1) {
-        const verb = clue.kind === 'adjacent' ? 'был рядом' : 'был не рядом';
+        const verb = clue.kind === 'adjacent'
+          ? `${wasVerb(peopleMap, clue.person)} рядом`
+          : `${wasVerb(peopleMap, clue.person)} не рядом`;
         const objects = group.map((c) => objForms(c.object_type).instr);
         out.push(`${personName(peopleMap, clue.person)} ${verb} ${objects.join(' и ')}`);
         i = j;
         continue;
       }
     }
-    out.push(clueToText(clue, peopleMap));
+    out.push(clueToText(clue, peopleMap, roomsMap));
     i++;
   }
   return out;

@@ -72,10 +72,16 @@ body {
   position: absolute;
   top: 2px;
   left: 4px;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
-  color: rgba(35, 35, 43, 0.75);
+  color: rgba(35, 35, 43, 0.8);
   line-height: 1;
+  white-space: nowrap;
+  /* white halo so the name stays readable when it overflows the corner
+     cell onto neighbouring cells */
+  text-shadow:
+    0 0 3px rgba(255, 255, 255, 0.95),
+    0 0 2px rgba(255, 255, 255, 0.95);
   pointer-events: none;
 }
 
