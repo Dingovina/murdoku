@@ -107,9 +107,11 @@ class TruthContext:
             # the victim included (orth-adjacency is impossible under the
             # distinct-rows/cols rule, so «рядом с человеком» can only mean
             # the shared room)
+            wanted = clue["gender"]  # KeyError when missing (malformed)
+            if wanted not in ("m", "f"):
+                raise ValueError(f"invalid gender {wanted!r}")
             room = self.puzzle.room_of(placement[clue["person"]])
             pid = clue["person"]
-            wanted = clue["gender"]
             if room is None:
                 return False
             return any(other != pid

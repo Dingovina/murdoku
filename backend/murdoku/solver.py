@@ -339,10 +339,15 @@ class Prepared:
             if clue.get("kind") != "adjacent_gender":
                 continue
             i = index.get(clue.get("person"))
-            g = clue.get("gender")
-            if i is None or g not in by_gender:
+            if i is None:
+                # unknown person: reachable only without validate() (clue_truth
+                # raises on the same input, so skipping keeps parity for
+                # well-formed puzzles and fails loudly elsewhere)
                 continue
-            checks.append((i, g))
+            # the gender is kept verbatim: a gender nobody has (or a malformed
+            # value) makes the clue UNSATISFIABLE, matching clue_truth's
+            # always-false verdict — never silently dropped
+            checks.append((i, clue.get("gender")))
         self.gender_checks = checks
         self.people_by_gender = {g: tuple(v) for g, v in by_gender.items()}
 
@@ -663,12 +668,13 @@ class Prepared:
                 if no_empty and counts.count(0) > 1:
                     return  # counts[0] is always 0 (rooms are 1-based)
                 # adjacent_gender: the person's room must hold another
-                # person of the required gender (any person counts)
+                # person of the required gender (any person counts); a
+                # gender nobody has fails via the empty default
                 for (p_idx, g) in gender_checks:
                     rid = room_id_of[assigned[p_idx]]
                     if not any(q_idx != p_idx
                                and room_id_of[assigned[q_idx]] == rid
-                               for q_idx in people_by_gender[g]):
+                               for q_idx in people_by_gender.get(g, ())):
                         return
                 yield {people[i]: (c // w, c % w)
                        for i, c in enumerate(assigned)}

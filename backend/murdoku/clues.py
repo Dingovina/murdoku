@@ -18,8 +18,8 @@ solution, restricted to the SPEC §6 step-5 domains:
 The victim is never referenced by A/B/C clues (SPEC §4).
 
 The result is sorted by a deterministic key: kind order as in SPEC §4,
-person number, object type id, room id, count, op index (plus person2 as a
-final tie-breaker for C1 pairs).
+person number, object type id, gender, room id, count, op index (plus
+person2 as a final tie-breaker for C1 pairs).
 
 ``prune_clues`` implements the SPEC greedy thinning: with the caller's RNG,
 shuffle the directional C1 clues into a first pass and every other clue into

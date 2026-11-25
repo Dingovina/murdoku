@@ -6,6 +6,7 @@ evaluator defined here (not the solver).
 """
 
 import pytest
+from itertools import permutations
 from random import Random
 
 from murdoku.clues import (
@@ -375,21 +376,76 @@ def test_adjacent_gender_solver_counts_exactly():
                 assert clue_is_true(probe, sol, clue)
 
 
-def test_adjacent_gender_prune_is_only_an_optimization():
-    """The static room prune never changes the solution set: puzzles with
-    and without the (redundant) prune path give identical counts."""
-    puzzle = gendered_puzzle([
+def brute_force_count(puzzle, limit=100):
+    """Count rule-valid placements satisfying every clue WITHOUT the solver
+    (itertools over all person->cell permutations) — the differential
+    oracle for solver parity tests."""
+    cells = sorted(puzzle.allowed_cells())
+    people = puzzle.people_ids()
+    count = 0
+    for combo in permutations(cells, len(people)):
+        if len({r for r, _ in combo}) != len(combo) \
+                or len({c for _, c in combo}) != len(combo):
+            continue
+        placement = dict(zip(people, combo))
+        vroom = puzzle.room_of(placement["victim"])
+        inside = [pid for pid in puzzle.suspect_ids()
+                  if puzzle.room_of(placement[pid]) is vroom]
+        if len(inside) != 1:
+            continue
+        if all(clue_is_true(puzzle, placement, c) for c in puzzle.clues):
+            count += 1
+            if count >= limit:
+                break
+    return count
+
+
+def test_adjacent_gender_solver_matches_brute_force():
+    """Solver parity oracle (code-review): for every gender-clue variant the
+    solver's count equals the direct brute-force count — the static prune
+    and the completion check never drop or admit a solution."""
+    base = gendered_puzzle([
         {"kind": "same_room", "person": "suspect_1", "person2": "victim"},
     ])
-    clue_f = {"kind": "adjacent_gender", "person": "suspect_1", "gender": "f"}
-    clue_m = {"kind": "adjacent_gender", "person": "suspect_1", "gender": "m"}
-    probe_f = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people,
-                     (clue_f,))
-    probe_m = Puzzle(3, 3, puzzle.rooms, puzzle.objects, puzzle.people,
-                     (clue_m,))
-    # victim is male: m-variant solvable, f-variant dead (vacuously)
-    assert count_solutions(probe_m, 10) > 0
-    assert count_solutions(probe_f, 10) == 0
+    variants = [
+        [],
+        [{"kind": "adjacent_gender", "person": "suspect_1", "gender": "m"}],
+        [{"kind": "adjacent_gender", "person": "suspect_1", "gender": "f"}],
+        [{"kind": "adjacent_gender", "person": "suspect_2", "gender": "m"}],
+        [{"kind": "adjacent_gender", "person": "suspect_2", "gender": "f"}],
+    ]
+    for extra in variants:
+        probe = Puzzle(3, 3, base.rooms, base.objects, base.people,
+                       tuple(base.clues) + tuple(extra))
+        want = brute_force_count(probe)
+        got = count_solutions(probe, 100)
+        assert got == want, f"mismatch for {extra}: solver={got}, brute={want}"
+
+
+def test_adjacent_gender_unsatisfiable_when_gender_absent():
+    """A gender clue naming a gender NO person has is unsatisfiable for the
+    solver too (code-review bug: it used to be silently dropped, reporting
+    solutions that violate the clue, diverging from clue_truth)."""
+    legacy_people = (  # pre-phase-5 people: no gender at all
+        Person("suspect_1", "Подозреваемый_1", 101),
+        Person("suspect_2", "Подозреваемый_2", 102),
+        Person("victim", "Убитый", 103),
+    )
+    puzzle = Puzzle(3, 3, scenario_rooms(), (), legacy_people,
+                    ({"kind": "adjacent_gender",
+                      "person": "suspect_1", "gender": "f"},))
+    puzzle.validate()
+    assert count_solutions(puzzle, 100) == 0
+    # clue_truth agrees: the clue is false on every rule-valid placement
+    from murdoku.clue_truth import TruthContext
+    ctx = TruthContext(puzzle)
+    cells = sorted(puzzle.allowed_cells())
+    people = puzzle.people_ids()
+    for combo in permutations(cells, len(people)):
+        placement = {pid: cell for pid, cell in zip(people, combo)}
+        if not ctx.rules_ok(placement):
+            continue
+        assert not ctx.clue_holds(puzzle.clues[0], placement)
 
 
 def test_enumerate_empty_objects_yields_no_ab_clues():
