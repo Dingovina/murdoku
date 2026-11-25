@@ -187,9 +187,15 @@ Templates (P = person name, Q = personGenitive(person2)):
 | room_count | `В комнате_{room} было {op} {count} {noun}` — op: eq `ровно`, ne `не`, gt `более`, ge `не менее`, lt `менее`, le `не более`. Noun: for eq/ne use `peopleForm(count)`; for gt/ge/lt/le use the **genitive** form (`человека` when count%10==1 and count%100!=11, else `человек`) — per SPEC §4 D1: «более 1 человека», «не менее 2 человек» |
 | no_empty_rooms | `Пустых комнат не было` |
 
-Portraits (`js/portraits.js`, pure): `hue = portrait_seed % 360`. Suspect chip: circle
-`hsl(hue, 70%, 45%)`, white initial `П{n}` (n = suspect number). Victim: near-black
-circle with `☠`.
+Portraits (`js/portraits.js`, pure): `hue = portrait_seed % 360`. Suspect chip: a
+pastel circle `hsl(hue, 45%, 82%)` filled with a composite SVG portrait assembled
+from `portrait_seed` via a deterministic PRNG (mulberry32): skin tone, hair form +
+color, glasses (35%), beard (30%), collar (3 shapes; collar colors are hue-derived
+from `portrait_seed`, like the chip background). Victim: near-black circle with
+`☠` (no SVG).
+`clueListToTexts` renders the clue list, merging consecutive same-person
+adjacent / not_adjacent clues into one sentence («рядом со столом и с креслом»);
+merging is display-only.
 
 ## 6. Solver (`murdoku/solver.py`)
 

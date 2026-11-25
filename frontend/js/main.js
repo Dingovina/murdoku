@@ -1,7 +1,7 @@
 // App state, wiring, DOM. Placement rules and API calls live here.
 
 import { fetchPuzzle, checkAnswer, revealSolution } from './api.js';
-import { clueToText } from './clues.js';
+import { clueListToTexts } from './clues.js';
 import { Board } from './board.js';
 
 const DIFFICULTY_DEFAULT = 'medium';
@@ -28,14 +28,15 @@ function canInteract() {
 }
 
 // Test hooks (unused in the browser flow; lets node --test reach the guards).
-export const __test = { state, canInteract, clearBoard };
+export const __test = { state, canInteract, clearBoard, derivedAccusation };
 
 function suspects() {
   return state.puzzle ? state.puzzle.people.filter((p) => p.id !== 'victim') : [];
 }
 
 function allPlaced() {
-  return state.puzzle && state.placements.size === state.puzzle.people.length;
+  return Boolean(state.puzzle && state.puzzle.people)
+    && state.placements.size === state.puzzle.people.length;
 }
 
 // --- init ---
@@ -50,7 +51,6 @@ function init() {
     newGame();
   });
   $('accuse') && $('accuse').addEventListener('click', accuse);
-  $('accusation') && $('accusation').addEventListener('input', updateControls);
   $('clear-board') && $('clear-board').addEventListener('click', clearBoard);
   $('show-solution') && $('show-solution').addEventListener('click', giveUp);
   newGame();
@@ -75,7 +75,7 @@ async function newGame() {
     renderBoard();
     renderClues();
     renderPalette();
-    setStatus('Разместите всех людей и укажите убийцу.');
+    setStatus('Разместите всех людей: обвиняемым станет тот, кто наедине с убитым.');
   } catch (err) {
     setStatus('Не удалось загрузить пазл: ' + err.message, true);
   } finally {
@@ -109,14 +109,22 @@ function renderClues() {
   if (!list) return;
   list.innerHTML = '';
   const peopleMap = new Map(state.puzzle.people.map((p) => [p.id, p]));
-  for (const clue of state.puzzle.clues) {
-    const li = document.createElement('li');
-    let text;
-    try {
-      text = clueToText(clue, peopleMap);
-    } catch (err) {
-      text = 'Неизвестная подсказка (' + err.message + ')';
+  let texts;
+  try {
+    texts = clueListToTexts(state.puzzle.clues, peopleMap);
+  } catch (err) {
+    // fall back to per-clue rendering so the error line names the culprit
+    texts = [];
+    for (const clue of state.puzzle.clues) {
+      try {
+        texts.push(clueListToTexts([clue], peopleMap)[0]);
+      } catch (inner) {
+        texts.push('Неизвестная подсказка (' + inner.message + ')');
+      }
     }
+  }
+  for (const text of texts) {
+    const li = document.createElement('li');
     li.textContent = text;
     list.appendChild(li);
   }
@@ -130,16 +138,6 @@ function renderPalette() {
     palette.appendChild(state.board.makePaletteChip(person));
   }
   refreshPaletteChips();
-
-  const datalist = $('suspect-names');
-  if (datalist) {
-    datalist.innerHTML = '';
-    for (const p of suspects()) {
-      const option = document.createElement('option');
-      option.value = p.name;
-      datalist.appendChild(option);
-    }
-  }
 }
 
 function refreshPaletteChips() {
@@ -235,24 +233,59 @@ function placedAt(r, c) {
 
 // --- accusation ---
 
-/** Resolve the input text (trim, case-insensitive) to a suspect id or null. */
-function resolveAccusation() {
-  const input = $('accusation');
-  if (!input) return null;
-  const text = input.value.trim().toLowerCase();
-  if (!text) return null;
-  const match = suspects().find((p) => p.name.toLowerCase() === text);
-  return match ? match.id : null;
+/** Room id at (r, c) per the puzzle layout, or null for voids/off-field. */
+function roomIdAt(puzzle, r, c) {
+  for (const room of puzzle.rooms) {
+    for (const cell of room.cells) {
+      if (cell.r === r && cell.c === c) return room.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * The suspect alone with the victim per the USER's placements (SPEC §3
+ * murder-room rule): exactly one suspect in the victim's room.
+ * @returns {string|null} suspect id, or null when the invariant does not hold
+ */
+function derivedAccusation() {
+  if (!state.puzzle || !allPlaced()) return null;
+  const victimCell = state.placements.get('victim');
+  if (!victimCell) return null;
+  const victimRoom = roomIdAt(state.puzzle, victimCell.r, victimCell.c);
+  if (victimRoom === null) return null;
+  const inside = suspects().filter((p) => {
+    const pos = state.placements.get(p.id);
+    return roomIdAt(state.puzzle, pos.r, pos.c) === victimRoom;
+  });
+  return inside.length === 1 ? inside[0].id : null;
 }
 
 function canAccuse() {
-  return Boolean(state.puzzle) && allPlaced() && resolveAccusation() !== null;
+  return derivedAccusation() !== null;
 }
 
-/** Refresh the enable/disable state of every action button. */
+/** Refresh the enable/disable state and labels of every action button. */
 function updateControls() {
   const accuse = $('accuse');
-  if (accuse) accuse.disabled = state.busy || state.solved || !canAccuse();
+  const hint = $('accuse-hint');
+  const accusedId = derivedAccusation();
+  if (accuse) {
+    const person = accusedId ? personById(accusedId) : null;
+    accuse.textContent = person ? `Обвинить: ${person.name}` : 'Обвинить';
+    accuse.disabled = state.busy || state.solved || !canAccuse();
+  }
+  if (hint) {
+    let text = '';
+    if (!state.solved && state.puzzle) {
+      if (!allPlaced()) text = 'Разместите всех людей, чтобы обвинить.';
+      else if (accusedId === null) {
+        text = 'Обвинение недоступно: наедине с убитым должен быть ровно один подозреваемый.';
+      }
+    }
+    hint.textContent = text;
+    hint.hidden = !text;
+  }
   const clear = $('clear-board');
   if (clear) clear.disabled = !canInteract() || !hasBoardProgress();
   const reveal = $('show-solution');
@@ -294,7 +327,7 @@ function applyReveal(solution) {
 
 async function accuse() {
   if (state.busy || state.solved || !canAccuse()) return;
-  const accusationId = resolveAccusation();
+  const accusationId = derivedAccusation();
   if (accusationId === null) return; // do not send the request
   const placements = state.puzzle.people.map((p) => {
     const pos = state.placements.get(p.id);

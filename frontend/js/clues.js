@@ -51,17 +51,19 @@ function objForms(type) {
   return f;
 }
 
+function personName(peopleMap, id) {
+  const p = peopleMap.get(id);
+  if (!p) throw new Error('Unknown person id: ' + id);
+  return p.name;
+}
+
 /**
  * Render one clue to Russian text (no trailing period).
  * @param {object} clue clue dict (SPEC §4 format)
  * @param {Map<string, {id: string, name: string}>} peopleMap person_id -> person
  */
 export function clueToText(clue, peopleMap) {
-  const name = (id) => {
-    const p = peopleMap.get(id);
-    if (!p) throw new Error('Unknown person id: ' + id);
-    return p.name;
-  };
+  const name = (id) => personName(peopleMap, id);
   switch (clue.kind) {
     case 'on':            return `${name(clue.person)} был на ${objForms(clue.object_type).prep}`;
     case 'not_on':        return `${name(clue.person)} был не на ${objForms(clue.object_type).prep}`;
@@ -83,4 +85,41 @@ export function clueToText(clue, peopleMap) {
     case 'no_empty_rooms': return 'Пустых комнат не было';
     default: throw new Error('Unknown clue kind: ' + clue.kind);
   }
+}
+
+/**
+ * Render a clue LIST for display, merging runs of same-person adjacent /
+ * not_adjacent clues into one sentence: «X был рядом со столом и с креслом».
+ * Merging is visual only (the clue list itself is untouched); a run is
+ * consecutive same-kind + same-person clues in the given order, everything
+ * else renders via clueToText one line per clue.
+ * @param {object[]} clues clue dicts (SPEC §4 format)
+ * @param {Map<string, {id: string, name: string}>} peopleMap
+ * @returns {string[]} one string per displayed line, order preserved
+ */
+export function clueListToTexts(clues, peopleMap) {
+  const out = [];
+  let i = 0;
+  while (i < clues.length) {
+    const clue = clues[i];
+    if (clue.kind === 'adjacent' || clue.kind === 'not_adjacent') {
+      const group = [clue];
+      let j = i + 1;
+      while (j < clues.length && clues[j].kind === clue.kind
+             && clues[j].person === clue.person) {
+        group.push(clues[j]);
+        j++;
+      }
+      if (group.length > 1) {
+        const verb = clue.kind === 'adjacent' ? 'был рядом' : 'был не рядом';
+        const objects = group.map((c) => objForms(c.object_type).instr);
+        out.push(`${personName(peopleMap, clue.person)} ${verb} ${objects.join(' и ')}`);
+        i = j;
+        continue;
+      }
+    }
+    out.push(clueToText(clue, peopleMap));
+    i++;
+  }
+  return out;
 }

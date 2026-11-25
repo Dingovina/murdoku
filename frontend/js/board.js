@@ -1,7 +1,7 @@
 // Board rendering + Pointer Events drag & drop. DOM-only logic; placement
 // rules (occupied/full/void) are decided by main.js via handlers.
 
-import { portraitOf } from './portraits.js';
+import { portraitOf, portraitSvg } from './portraits.js';
 
 // Object type registry: emoji icons and mergeability (SPEC §2).
 const OBJECT_ICONS = {
@@ -399,9 +399,16 @@ export class Board {
     chip.title = person.name;
     const circle = document.createElement('span');
     circle.className = 'chip__circle';
-    circle.style.background = p.bg;
-    circle.style.color = p.fg;
-    circle.textContent = p.initial;
+    const svg = portraitSvg(person);
+    if (svg) {
+      // composite suspect portrait; the pastel circle tints the background
+      circle.style.background = `hsl(${p.hue}, 45%, 82%)`;
+      circle.innerHTML = svg;
+    } else {
+      circle.style.background = p.bg;
+      circle.style.color = p.fg;
+      circle.textContent = p.initial;
+    }
     chip.appendChild(circle);
     if (withName) {
       const label = document.createElement('span');

@@ -1,7 +1,7 @@
-// Tests for clueToText / peopleForm / personGenitive (ARCHITECTURE.md §5).
+// Tests for clueToText / clueListToTexts / peopleForm / personGenitive (ARCHITECTURE.md §5).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clueToText, peopleForm, personGenitive } from '../js/clues.js';
+import { clueToText, clueListToTexts, peopleForm, personGenitive } from '../js/clues.js';
 
 const PEOPLE = new Map([
   ['suspect_1', { id: 'suspect_1', name: 'Подозреваемый_1' }],
@@ -140,4 +140,48 @@ test('clueToText throws on unknown kind / person / object type', () => {
   assert.throws(() => text({ kind: 'wat' }));
   assert.throws(() => text({ kind: 'on', person: 'alien', object_type: 'bed' }));
   assert.throws(() => clueToText({ kind: 'on', person: 'suspect_1', object_type: 'sauna' }, PEOPLE));
+});
+
+// --- clueListToTexts: display-only merging of adjacent runs ---
+
+const adj = (person, object_type) => ({ kind: 'adjacent', person, object_type });
+const notAdj = (person, object_type) => ({ kind: 'not_adjacent', person, object_type });
+
+test('clueListToTexts merges a same-person adjacent run into one sentence', () => {
+  const out = clueListToTexts(
+    [adj('suspect_1', 'table'), adj('suspect_1', 'tv'), adj('suspect_1', 'bed')], PEOPLE);
+  assert.deepEqual(out, ['Подозреваемый_1 был рядом со столом и с телевизором и с кроватью']);
+});
+
+test('clueListToTexts merges not_adjacent runs with the negated verb', () => {
+  const out = clueListToTexts([notAdj('suspect_2', 'carpet'), notAdj('suspect_2', 'sofa')], PEOPLE);
+  assert.deepEqual(out, ['Подозреваемый_2 был не рядом с ковром и с диваном']);
+});
+
+test('clueListToTexts does not mix kinds or persons in one run', () => {
+  const out = clueListToTexts(
+    [adj('suspect_1', 'table'), notAdj('suspect_1', 'tv'), adj('suspect_2', 'bed')], PEOPLE);
+  assert.deepEqual(out, [
+    'Подозреваемый_1 был рядом со столом',
+    'Подозреваемый_1 был не рядом с телевизором',
+    'Подозреваемый_2 был рядом с кроватью',
+  ]);
+});
+
+test('clueListToTexts passes other kinds through one line per clue', () => {
+  const out = clueListToTexts([
+    { kind: 'on', person: 'suspect_1', object_type: 'bed' },
+    adj('suspect_1', 'table'),
+    adj('suspect_1', 'tv'),
+    { kind: 'no_empty_rooms' },
+  ], PEOPLE);
+  assert.deepEqual(out, [
+    'Подозреваемый_1 был на кровати',
+    'Подозреваемый_1 был рядом со столом и с телевизором',
+    'Пустых комнат не было',
+  ]);
+});
+
+test('clueListToTexts throws on unknown data like clueToText does', () => {
+  assert.throws(() => clueListToTexts([adj('alien', 'table')], PEOPLE));
 });
