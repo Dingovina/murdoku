@@ -193,11 +193,7 @@ function clearBoard() {
     board.removePerson(personId);
   }
   state.placements.clear();
-  for (const key of state.marks) {
-    const [r, c] = key.split(',').map(Number);
-    board.setMark(r, c, false);
-  }
-  state.marks.clear();
+  dropAllMarks();
   board.clearMisplaced();
   refreshPaletteChips();
   updateControls();
@@ -207,6 +203,15 @@ function clearBoard() {
 /** True when the board holds at least one placement or ✕ mark. */
 function hasBoardProgress() {
   return state.placements.size > 0 || state.marks.size > 0;
+}
+
+/** Remove every ✕ mark from the board and the state. */
+function dropAllMarks() {
+  for (const key of state.marks) {
+    const [r, c] = key.split(',').map(Number);
+    state.board.setMark(r, c, false);
+  }
+  state.marks.clear();
 }
 
 /** Click an empty cell -> toggle the red «✕» («здесь никого»). */
@@ -257,14 +262,14 @@ function updateControls() {
 /** «Показать решение»: give up, reveal the answer, end the game. */
 async function giveUp() {
   if (!canInteract()) return;
-  if (!window.confirm('Показать решение? Игра будет завершена.')) return;
+  if (!window.confirm('Сдаться и показать решение?')) return;
   state.busy = true;
   setControlsEnabled(false);
   setStatus('Получаем решение…');
   try {
     const { solution, killer_id } = await revealSolution(state.token);
-    state.solved = true;
-    state.board.showSolution(solution);
+    dropAllMarks();
+    applyReveal(solution);
     const killer = personById(killer_id);
     setStatus(`Убийца — ${killer ? killer.name : killer_id}. Решение показано.`);
   } catch (err) {
@@ -272,8 +277,19 @@ async function giveUp() {
   } finally {
     state.busy = false;
     setControlsEnabled(true);
-    updateControls(); // solved: interactions stay blocked, new game works
+    updateControls();
   }
+}
+
+/** Render the reveal placement and end the game (only after a success). */
+function applyReveal(solution) {
+  state.board.showSolution(solution);
+  // Keep the app state coherent with what the board now shows: everyone is
+  // placed at the revealed solution, so palette chips all look placed.
+  state.placements = new Map(Object.entries(solution).map(
+    ([pid, rc]) => [pid, { r: rc[0], c: rc[1] }]));
+  refreshPaletteChips();
+  state.solved = true;
 }
 
 async function accuse() {

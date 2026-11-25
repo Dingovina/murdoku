@@ -373,10 +373,22 @@ def test_solution_reveal_invalid_token(client):
     assert "error" in response.json()
 
 
-def test_solution_reveal_token_without_payload_fields(client, token):
+def test_solution_reveal_token_without_payload_fields(client):
     """A structurally valid token lacking solution/killer_id is rejected."""
     stripped = tokens.make_token({"game_id": "0" * 32})
     response = client.get("/api/solution", params={"token": stripped})
+    assert response.status_code == 400
+    assert "solution/killer_id" in response.json()["error"]
+
+
+def test_solution_reveal_token_with_malformed_solution(client):
+    """Garbage solution entries in a signed token are rejected, not echoed."""
+    malformed = tokens.make_token({
+        "game_id": "0" * 32,
+        "solution": {"victim": "abc"},
+        "killer_id": "suspect_1",
+    })
+    response = client.get("/api/solution", params={"token": malformed})
     assert response.status_code == 400
     assert "solution/killer_id" in response.json()["error"]
 

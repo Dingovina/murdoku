@@ -74,6 +74,25 @@ def _people_order(ids: Iterable[str]) -> list[str]:
     return sorted(ids, key=key)
 
 
+def _parsed_solution(payload: dict) -> dict[str, list[int]] | None:
+    """Validated ``{person_id: [r, c]}`` from a token payload, or None.
+
+    Shared by /api/check and /api/solution so both endpoints reject
+    malformed solution entries identically.
+    """
+    raw_solution = payload.get("solution")
+    if not isinstance(raw_solution, dict) or not raw_solution:
+        return None
+    solution: dict[str, list[int]] = {}
+    for pid, cell in raw_solution.items():
+        if not isinstance(pid, str) \
+                or not isinstance(cell, (list, tuple)) or len(cell) != 2 \
+                or not _is_int(cell[0]) or not _is_int(cell[1]):
+            return None
+        solution[pid] = [cell[0], cell[1]]
+    return solution
+
+
 def _killer_id(puzzle, solution: dict) -> str:
     """The only suspect in the victim's room (SPEC §3 rule 4)."""
     victim_room = puzzle.room_of(tuple(solution["victim"]))
@@ -159,17 +178,12 @@ async def api_check(request: Request) -> JSONResponse:
     except tokens.InvalidToken:
         return _error("invalid token")
 
-    raw_solution = payload.get("solution")
+    solution = _parsed_solution(payload)
     killer_id = payload.get("killer_id")
-    if not isinstance(raw_solution, dict) or not raw_solution:
-        return _error("invalid token: solution missing")
-    solution: dict[str, list[int]] = {}
-    for pid, cell in raw_solution.items():
-        if not isinstance(pid, str) \
-                or not isinstance(cell, (list, tuple)) or len(cell) != 2 \
-                or not _is_int(cell[0]) or not _is_int(cell[1]):
-            return _error("invalid token: malformed solution entry")
-        solution[pid] = [cell[0], cell[1]]
+    if solution is None:
+        return _error("invalid token: solution missing or malformed")
+    if not isinstance(killer_id, str):
+        return _error("invalid token: killer_id missing")
     people_ids = set(solution)
     suspect_ids = people_ids - {"victim"}
 
@@ -228,13 +242,12 @@ async def api_solution(request: Request) -> JSONResponse:
         payload = tokens.read_token(token)
     except tokens.InvalidToken:
         return _error("invalid token")
-    raw_solution = payload.get("solution")
+    solution = _parsed_solution(payload)
     killer_id = payload.get("killer_id")
-    if not isinstance(raw_solution, dict) or not raw_solution \
-            or not isinstance(killer_id, str):
-        return _error("invalid token: solution/killer_id missing")
+    if solution is None or not isinstance(killer_id, str):
+        return _error("invalid token: solution/killer_id missing or malformed")
     return JSONResponse({
-        "solution": raw_solution,
+        "solution": solution,
         "killer_id": killer_id,
     })
 
